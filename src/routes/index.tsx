@@ -1,8 +1,7 @@
 import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { AppRoutes } from "./app.routes";
 import { AuthRoutes } from "./auth.routes";
-import { View } from "react-native-reanimated/lib/typescript/Animated";
-import { StyleSheet } from 'react-native';
+import { SafeAreaView, StyleSheet } from 'react-native';
 
 export function Routes() {
   // const { authState, isLoading } = useAuth()
@@ -15,13 +14,13 @@ export function Routes() {
   // }
 
   return (
-    <View>
+    <SafeAreaView style={{ flex: 1 }}>
       <NavigationContainer>
         {/* {authState?.authenticated ? <AppRoutes /> : <AuthRoutes />} */}
         <AppRoutes />
         {/* <AuthRoutes /> */}
       </NavigationContainer>
-    </View>
+    </SafeAreaView>
   );
 }
 
