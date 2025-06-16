@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { AuthContext } from "../contexts/authContext";
 import { AuthNavigatorRoutesProps } from "../routes/auth.routes";
+import { useAuth } from "../hooks/useAuth";
 
 export function SignIn() {
   const { navigate } = useNavigation<AuthNavigatorRoutesProps>();

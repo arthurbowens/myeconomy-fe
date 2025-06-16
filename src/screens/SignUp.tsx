@@ -12,12 +12,14 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { AuthContext } from "../contexts/authContext";
+//import { AuthContext } from "../contexts/authContext";
+import { useAuth } from "../hooks/useAuth";
 import { AuthNavigatorRoutesProps } from "../routes/auth.routes";
 
 export function SignUp() {
   const { navigate } = useNavigation<AuthNavigatorRoutesProps>();
-  const { onRegister } = useContext(AuthContext);
+  //const { onRegister } = useContext(AuthContext);
+  const { onRegister } = useAuth();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -149,6 +151,7 @@ export function SignUp() {
       await onRegister(
         formData.name.trim(),
         formData.email.trim(),
+        formData.birthDate.trim(),
         formData.password,
         formData.confirmPassword
       );

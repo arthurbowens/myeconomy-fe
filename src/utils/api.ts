@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const app = axios.create({
-    baseURL: "http://10.0.2.2:8080/passgenerator/",
+    baseURL: "http://10.0.2.2:8080/myeconomymatutino/",
     headers: {
       'Content-Type': 'application/json',
     }
