@@ -3,8 +3,8 @@ import * as authMapper from "./authMapper";
 import { SignUpDTO } from "./authResource";
 import { getSigUpResponse } from "./authMapper";
 
-export const signIn = (email, password) => {
-  return authResource.signIn(email, password).then((response) => response.data);
+export const signIn = (email, senha) => {
+  return authResource.signIn(email, senha).then((response) => response.data);
 };
 
 export const signUp = (data: SignUpDTO) => {

@@ -17,7 +17,7 @@ export function Routes() {
     <SafeAreaView style={{ flex: 1 }}>
       <NavigationContainer>
         {/* {authState?.authenticated ? <AppRoutes /> : <AuthRoutes />} */}
-        <AppRoutes />
+        <AuthRoutes />
         {/* <AuthRoutes /> */}
       </NavigationContainer>
     </SafeAreaView>

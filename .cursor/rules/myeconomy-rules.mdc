@@ -1,0 +1,106 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Segue o prompt para o frontend do projeto "My Economy":
+
+```
+## Prompt para Desenvolvimento Frontend - Projeto "My Economy"
+
+Este documento descreve os requisitos e as ferramentas necessárias para o desenvolvimento do frontend do aplicativo "My Economy" em React Native.
+
+**Objetivo do Aplicativo:**
+O aplicativo visa permitir que o usuário cadastre suas despesas mensais e acompanhe se economizou ou não, com base em um objetivo/limite registrado.
+
+**Requisitos Gerais:**
+* Obrigatório o uso de **React Native**.
+* Aplicação funcional (frontend e backend).
+
+**Fluxo de Sessão:**
+* Controle de sessão: `signup`, `signin`, `signout`.
+* Campos obrigatórios para cadastro: data de nascimento, nome, email e senha.
+* Redirecionamento para a tela `Home` se autenticado ao fechar o app, caso contrário, para a tela `Signin`.
+
+**Fluxo da Home:**
+* Tela de `Home` com:
+    * Card com feedback (economizou, não economizou, nenhum limite registrado).
+    * Botão para redirecionar para a tela de limite.
+    * Barra de soma das despesas mensais conforme o limite mensal cadastrado (mostrar soma de despesas mesmo sem limite).
+    * Filtro por data (mês).
+    * Ao finalizar o mês, mostrar se o objetivo foi atingido (gastar menos que o limite), com imagem positiva em caso de sucesso.
+
+**Requisitos Específicos do Frontend (Baseados em slides fornecidos):**
+
+**1. Estrutura do Projeto:**
+* Utilizar `npx create-expo-app@2.3.0`.
+* Estrutura de pastas sugerida:
+    * `components` (para componentes reutilizáveis)
+    * `screens` (para telas da aplicação)
+    * `services` (para lógica de negócio, como geração de senha ou chamadas de API)
+    * `utils` (para funções utilitárias)
+
+**2. Navegação:**
+* Biblioteca: **@react-navigation/native**
+* Biblioteca para Stack Navigator: **@react-navigation/stack** (v6.x)
+* Biblioteca para Bottom Tabs: **@react-navigation/bottom-tabs**
+
+**3. Memória Local:**
+* Biblioteca: **@react-native-async-storage/async-storage**
+* Funcionalidades: Salvar string, salvar objeto, obter objeto, remover item.
+* Utilizado para persistência de dados no dispositivo (e.g., token de autenticação, informações de usuário).
+
+**4. Ícones:**
+* Biblioteca: **@expo/vector-icons**
+* Utilização: Importar `Ionicons` e `FontAwesomeIcons` (ou outros conforme necessidade).
+* Repositório para encontrar ícones: `https://icons.expo.fyi`
+
+**5. Gerenciamento de Estado e Ciclo de Vida (React Hooks):**
+* **useState:** Para armazenar e atualizar dados locais do componente (causa re-renderização).
+* **useRef:** Para guardar uma referência mutável que NÃO causa re-renderização.
+* **useEffect:** Para efeitos colaterais (chamadas de API, manipulação do DOM, etc.).
+* **useCallback:** Para memorizar funções e evitar recriação desnecessária em re-renderizações.
+* **useMemo:** Para memorizar valores caros de calcular e evitar recalcular toda hora.
+* **useContext:** Para acessar dados globais do React Context e compartilhar dados entre componentes sem passar props manualmente.
+
+**6. Componentes React Native (Exemplos de uso):**
+* `<View />`
+* `<Text />`
+* `<TextInput />`
+* `<Button />`
+* `<FlatList />`
+* `<SectionList />`
+* `<Image />`
+* `<Pressable />`
+* `<Modal />`
+* `<StatusBar />` (do Expo SDK)
+
+**7. Expo SDK (Outras funcionalidades):**
+* **Clipboard:** Para copiar conteúdo.
+* **Crypto:** Para criptografar valores (se necessário no frontend para alguma validação, mas a criptografia da senha deve ser no backend).
+* **Network:** Para verificar o status da rede.
+
+**8. Comunicação com Backend:**
+* **Rotas de Autenticação:**
+    * `/signin`: Payload (email, senha), Response (objeto com propriedade `token` - JWT).
+    * `/signup`: Payload (email, nome, senha, confirmação de senha). Validações: email já criado, email no padrão, senha e confirmação de senha iguais.
+* **Rotas de Cadastro de Item:**
+    * `POST /item`: Payload (nome, senha). Validações: item criado com o mesmo nome.
+    * `GET /items`: Response (lista de itens).
+    * `DELETE /item/:id`.
+* Tratamento de erros do backend:
+    * Exibir erros retornados pelo backend nas telas de signup e cadastro de item.
+    * Mostrar texto com erro genérico em telas de criação.
+    * Mostrar um `toast` em telas de obtenção e deleção de dados.
+
+**9. Boas Práticas de Código:**
+* Estrutura do código (componentes, duplicidade de código, código não utilizado, etc.).
+* Validações de campos e interação.
+* Evitar uso excessivo de IA que resulte em código não otimizado ou compreendido.
+
+Este prompt deve guiar o desenvolvimento do frontend, garantindo que todos os requisitos e tecnologias sejam considerados.
+
+
+
+
+```
