@@ -19,22 +19,22 @@ import { AuthNavigatorRoutesProps } from "../routes/auth.routes";
 export function SignUp() {
   const { navigate } = useNavigation<AuthNavigatorRoutesProps>();
   //const { onRegister } = useContext(AuthContext);
-  const { onRegister } = useAuth();
+  const { signUp } = useAuth();
 
   const [formData, setFormData] = useState({
-    name: "",
+    nome: "",
+    dataNascimento: "",
     email: "",
-    birthDate: "",
-    password: "",
-    confirmPassword: "",
+    senha: "",
+    confirmarSenha: "",
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({
-    name: "",
+    nome: "",
+    dataNascimento: "",
     email: "",
-    birthDate: "",
-    password: "",
-    confirmPassword: "",
+    senha: "",
+    confirmarSenha: "",
   });
 
   const validateEmail = (email: string) => {
@@ -47,30 +47,30 @@ export function SignUp() {
     const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
     if (!dateRegex.test(date)) return false;
 
-    const [, day, month, year] = date.match(dateRegex) || [];
-    const birthDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    const today = new Date();
-    const age = today.getFullYear() - birthDate.getFullYear();
+    const [, dia, mes, ano] = date.match(dateRegex) || [];
+    const dataNascimento = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+    const hoje = new Date();
+    const idade = hoje.getFullYear() - dataNascimento.getFullYear();
     
-    return age >= 13 && age <= 120; // Idade mínima e máxima razoável
+    return idade >= 13 && idade <= 120; // Idade mínima e máxima razoável
   };
 
   const validateForm = () => {
     const newErrors = {
-      name: "",
+      nome: "",
+      dataNascimento: "",
       email: "",
-      birthDate: "",
-      password: "",
-      confirmPassword: "",
+      senha: "",
+      confirmarSenha: "",
     };
     let isValid = true;
 
     // Validação do nome
-    if (!formData.name.trim()) {
-      newErrors.name = "Nome é obrigatório";
+    if (!formData.nome.trim()) {
+      newErrors.nome = "Nome é obrigatório";
       isValid = false;
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = "Nome deve ter no mínimo 2 caracteres";
+    } else if (formData.nome.trim().length < 2) {
+      newErrors.nome = "Nome deve ter no mínimo 2 caracteres";
       isValid = false;
     }
 
@@ -84,29 +84,29 @@ export function SignUp() {
     }
 
     // Validação da data de nascimento
-    if (!formData.birthDate.trim()) {
-      newErrors.birthDate = "Data de nascimento é obrigatória";
+    if (!formData.dataNascimento.trim()) {
+      newErrors.dataNascimento = "Data de nascimento é obrigatória";
       isValid = false;
-    } else if (!validateBirthDate(formData.birthDate)) {
-      newErrors.birthDate = "Data inválida (DD/MM/YYYY)";
+    } else if (!validateBirthDate(formData.dataNascimento)) {
+      newErrors.dataNascimento = "Data inválida (DD/MM/YYYY)";
       isValid = false;
     }
 
     // Validação da senha
-    if (!formData.password.trim()) {
-      newErrors.password = "Senha é obrigatória";
+    if (!formData.senha.trim()) {
+      newErrors.senha = "Senha é obrigatória";
       isValid = false;
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Senha deve ter no mínimo 6 caracteres";
+    } else if (formData.senha.length < 6) {
+      newErrors.senha = "Senha deve ter no mínimo 6 caracteres";
       isValid = false;
     }
 
     // Validação da confirmação de senha
-    if (!formData.confirmPassword.trim()) {
-      newErrors.confirmPassword = "Confirmação da senha é obrigatória";
+    if (!formData.confirmarSenha.trim()) {
+      newErrors.confirmarSenha = "Confirmação da senha é obrigatória";
       isValid = false;
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "As senhas não coincidem";
+    } else if (formData.confirmarSenha !== formData.confirmarSenha) {
+      newErrors.confirmarSenha = "As senhas não coincidem";
       isValid = false;
     }
 
@@ -129,7 +129,7 @@ export function SignUp() {
   };
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
-    if (field === "birthDate") {
+    if (field === "dataNascimento") {
       value = formatBirthDate(value);
     }
     
@@ -148,13 +148,13 @@ export function SignUp() {
 
     setLoading(true);
     try {
-      await onRegister(
-        formData.name.trim(),
-        formData.email.trim(),
-        formData.birthDate.trim(),
-        formData.password,
-        formData.confirmPassword
-      );
+      await signUp({
+        nome: formData.nome.trim(),
+        dataNascimento: formData.dataNascimento.trim(),
+        email: formData.email.trim(),
+        senha: formData.senha,
+        confirmarSenha: formData.confirmarSenha
+      });
       Alert.alert("Sucesso", "Conta criada com sucesso!", [
         { text: "OK", onPress: () => navigate("signIn") }
       ]);
@@ -187,15 +187,15 @@ export function SignUp() {
             <View style={styles.inputContainer}>
             <Text style={styles.label}>Nome</Text>
             <TextInput
-              style={[styles.input, errors.name ? styles.inputError : null]}
-              value={formData.name}
-              onChangeText={(text) => handleInputChange("name", text)}
+              style={[styles.input, errors.nome ? styles.inputError : null]}
+              value={formData.nome}
+              onChangeText={(text) => handleInputChange("nome", text)}
               placeholder="Digite seu nome completo"
               autoCapitalize="words"
               autoComplete="name"
               editable={!loading}
             />
-            {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
+            {errors.nome ? <Text style={styles.errorText}>{errors.nome}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -216,43 +216,43 @@ export function SignUp() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Data de nascimento</Text>
             <TextInput
-              style={[styles.input, errors.birthDate ? styles.inputError : null]}
-              value={formData.birthDate}
-              onChangeText={(text) => handleInputChange("birthDate", text)}
+              style={[styles.input, errors.dataNascimento ? styles.inputError : null]}
+              value={formData.dataNascimento}
+              onChangeText={(text) => handleInputChange("dataNascimento", text)}
               placeholder="DD/MM/AAAA"
               keyboardType="numeric"
               maxLength={10}
               editable={!loading}
             />
-            {errors.birthDate ? <Text style={styles.errorText}>{errors.birthDate}</Text> : null}
+            {errors.dataNascimento ? <Text style={styles.errorText}>{errors.dataNascimento}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Senha</Text>
             <TextInput
-              style={[styles.input, errors.password ? styles.inputError : null]}
-              value={formData.password}
-              onChangeText={(text) => handleInputChange("password", text)}
+              style={[styles.input, errors.senha ? styles.inputError : null]}
+              value={formData.senha}
+              onChangeText={(text) => handleInputChange("senha", text)}
               placeholder="Digite sua senha"
               secureTextEntry
               autoComplete="password-new"
               editable={!loading}
             />
-            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+            {errors.senha ? <Text style={styles.errorText}>{errors.senha}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Confirmar senha</Text>
             <TextInput
-              style={[styles.input, errors.confirmPassword ? styles.inputError : null]}
-              value={formData.confirmPassword}
-              onChangeText={(text) => handleInputChange("confirmPassword", text)}
+              style={[styles.input, errors.confirmarSenha ? styles.inputError : null]}
+              value={formData.confirmarSenha}
+              onChangeText={(text) => handleInputChange("confirmarSenha", text)}
               placeholder="Confirme sua senha"
               secureTextEntry
               autoComplete="password-new"
               editable={!loading}
             />
-            {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
+            {errors.confirmarSenha ? <Text style={styles.errorText}>{errors.confirmarSenha}</Text> : null}
           </View>
 
           <Pressable

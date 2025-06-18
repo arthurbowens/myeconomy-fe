@@ -1,13 +1,13 @@
 import axios from "axios";
 
-const app = axios.create({
+export const api = axios.create({
     baseURL: "http://10.0.2.2:8080/myeconomymatutino/",
     headers: {
       'Content-Type': 'application/json',
     }
 });
 
-app.interceptors.request.use(
+api.interceptors.request.use(
   (config) => {
     return config;
   },
@@ -17,7 +17,7 @@ app.interceptors.request.use(
   }
 );
 
-app.interceptors.response.use(
+api.interceptors.response.use(
   (response) => {
     return response;
   },
@@ -31,5 +31,3 @@ app.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-export default app;

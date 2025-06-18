@@ -1,24 +1,71 @@
-import api from '../../utils/api';
+import { getItem, setItem } from 'expo-secure-store';
+import { api }from '../../utils/api';
+import { removeItem } from '../../utils/localStorage';
+import { AUTH_TOKEN_STORAGE } from '../../utils/storageConfig';
 
-export type SignUpDTO = {
+type SignUpDTO = {
     nome: string;
-    email: string;
     dataNascimento: string;
+    email: string;
     senha: string;
     confirmarSenha: string;
 }
 
-export const signIn = (email, senha) => {
-    return api.post('/auth/signin', { 
-        email, 
+async function signIn(email: string, password: string) {
+    try {
+      const { data } = await api.post('/auth/signin', {
+        email,
+        password
+      })
+  
+      await setItem(AUTH_TOKEN_STORAGE, data.token)
+  
+      return data
+    } catch (error) {
+      throw error
+    }
+  
+  }
+  
+  async function signUp({
+    nome,
+    dataNascimento,
+    email,
+    senha,
+    confirmarSenha
+  }: SignUpDTO) {
+    try {
+      // Converte a data do formato DD/MM/YYYY para YYYY-MM-DD
+      const [dia, mes, ano] = dataNascimento.split('/');
+      const dataFormatada = `${ano}-${mes}-${dia}`;
+
+      await api.post('/auth/signup', {
+        nome,
+        dataNascimento: dataFormatada,
+        email,
         senha,
-    });
-};
-
-export const signUp = (data: SignUpDTO) => {
-    return api.post('/auth/signup', data);
-};
-
-export const signOut = () => {
-    return api.get('/auth/signout');
-};
+        confirmarSenha,
+      })
+    } catch (error) {
+      if (error.response?.data) {
+        throw new Error(error.response.data);
+      }
+      throw error;
+    }
+  }
+  
+  async function signOut() {
+    try {
+      await removeItem(AUTH_TOKEN_STORAGE)
+    } catch (error) {
+      throw error
+    }
+  }
+  
+  async function getAuthToken() {
+    const token = getItem(AUTH_TOKEN_STORAGE)
+  
+    return token
+  }
+  
+  export { SignUpDTO, signIn, signUp, signOut, getAuthToken }

@@ -1,19 +1,29 @@
-import * as authResource from "./authResource";
-import * as authMapper from "./authMapper";
-import { SignUpDTO } from "./authResource";
-import { getSigUpResponse } from "./authMapper";
+import * as authResource from './authResource'
 
-export const signIn = (email, senha) => {
-  return authResource.signIn(email, senha).then((response) => response.data);
-};
+async function signIn(email: string, password: string) {
+  const data = await authResource.signIn(email, password)
 
-export const signUp = (data: SignUpDTO) => {
-  const dto = authMapper.getSignUpDTO(data);
-  return authResource
-    .signUp(dto)
-    .then((response) => getSigUpResponse(response.data));
-};
+  return data
+}
 
-export const signOut = () => {
-  return authResource.signOut().then((response) => response.data);
-};
+async function signUp({
+  nome,
+  dataNascimento,
+  email,
+  senha,
+  confirmarSenha,
+}: authResource.SignUpDTO) {
+  await authResource.signUp({ nome, dataNascimento, email, senha, confirmarSenha })
+}
+
+async function signOut() {
+  await authResource.signOut()
+}
+
+async function getAuthToken() {
+  const token = authResource.getAuthToken()
+
+  return token
+}
+
+export { signIn, signUp, signOut, getAuthToken }
