@@ -1,5 +1,5 @@
-import { getItem, setItem } from 'expo-secure-store';
-import { api }from '../../utils/api';
+import { getItem } from 'expo-secure-store';
+import { api } from '../../utils/api';
 import { removeItem } from '../../utils/localStorage';
 import { AUTH_TOKEN_STORAGE } from '../../utils/storageConfig';
 
@@ -28,7 +28,6 @@ type SignUpDTO = {
     confirmarSenha
   }: SignUpDTO) {
     try {
-      // Converte a data do formato DD/MM/YYYY para YYYY-MM-DD
       const [dia, mes, ano] = dataNascimento.split('/');
       const dataFormatada = `${ano}-${mes}-${dia}`;
 
@@ -61,4 +60,4 @@ type SignUpDTO = {
     return token
   }
   
-  export { SignUpDTO, signIn, signUp, signOut, getAuthToken }
+  export { getAuthToken, signIn, signOut, signUp, SignUpDTO };

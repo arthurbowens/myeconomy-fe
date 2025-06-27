@@ -1,18 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-} from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { useNavigation } from '@react-navigation/native';
-import * as limitesService from '../services/limitesService';
-import * as despesasService from '../services/despesasService';
-import { useAuth } from '../hooks/useAuth';
-import { AppNavigatorRoutesProps } from '../routes/app.routes';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useAuth } from '../hooks/useAuth';
+import { ProgressoDTO, Scenario } from '../resources/progressoResource';
+import { AppNavigatorRoutesProps } from '../routes/app.routes';
+import * as limitesService from '../services/limitesService';
+import * as progressoService from '../services/progressoService';
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -23,6 +24,7 @@ export default function HomeScreen() {
 
   const [limiteValor, setLimiteValor] = useState<number | null>(null);
   const [totalDespesas, setTotalDespesas] = useState<number>(0);
+  const [scenario, setScenario] = useState<Scenario | null>(null);
 
   useEffect(() => {
     async function init() {
@@ -41,23 +43,28 @@ export default function HomeScreen() {
     if (mesSelecionado) {
       carregarInfoMes(mesSelecionado);
     } else {
-      // reset
       setLimiteValor(null);
       setTotalDespesas(0);
+      setScenario(null);
     }
   }, [mesSelecionado]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (mesSelecionado) {
+        carregarInfoMes(mesSelecionado);
+      }
+    }, [mesSelecionado])
+  );
+
   async function carregarInfoMes(mesPick: string) {
     try {
-      const limites = await limitesService.listarLimitesUsuario();
-      const limiteObj = limites.find((l) => monthYearToPick(l.mesReferencia) === mesPick);
-      setLimiteValor(limiteObj ? limiteObj.valor : null);
-
-      const despesas = await despesasService.listarDespesasPorMesPick(mesPick);
-      const total = despesas.reduce((sum, d) => sum + d.valor, 0);
-      setTotalDespesas(total);
+      const progresso: ProgressoDTO = await progressoService.obterProgressoPorMesPick(mesPick);
+      setLimiteValor(progresso.limite);
+      setTotalDespesas(progresso.totalDespesas);
+      setScenario(progresso.scenario);
     } catch (error) {
-      console.error('Erro ao carregar informações do mês', error);
+      console.error('Erro ao carregar progresso', error);
     }
   }
 
@@ -80,19 +87,24 @@ export default function HomeScreen() {
     return `${map[month]}/${year}`;
   }
 
-  let scenario: 'noInfo' | 'continue' | 'economizou' | 'gasto';
-  if (mesSelecionado === '') {
-    scenario = 'continue';
-  } else if (limiteValor === null) {
-    scenario = 'noInfo';
-  } else if (totalDespesas <= limiteValor) {
-    const saved = limiteValor - totalDespesas;
-    scenario = saved >= limiteValor / 2 ? 'economizou' : 'continue';
-  } else {
-    scenario = 'gasto';
-  }
+  const uiScenario = (() => {
+    if (!scenario) return 'continue';
+    switch (scenario) {
+      case 'ECONOMIZOU':
+        return 'economizou';
+      case 'NAO_ECONOMIZOU':
+        return 'gasto';
+      case 'SEM_INFO':
+      case 'SEM_LIMITE':
+      case 'SEM_DESPESA':
+        return 'noInfo';
+      case 'EM_ANDAMENTO':
+      default:
+        return 'continue';
+    }
+  })();
 
-  const progressRatio = limiteValor ? Math.min(totalDespesas / limiteValor, 1) : 0;
+  const progressRatio = limiteValor ? Math.min(totalDespesas / (limiteValor || 1), 1) : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -116,27 +128,27 @@ export default function HomeScreen() {
 
       {/* Card */}
       <LinearGradient colors={['#35b559', '#8cd58f']} style={styles.card}>
-        {scenario === 'continue' && (
+        {uiScenario === 'continue' && (
           <>
             <Text style={styles.emoji}>🙂</Text>
             <Text style={styles.cardText}>Continue assim!</Text>
           </>
         )}
-        {scenario === 'economizou' && (
+        {uiScenario === 'economizou' && (
           <>
             <Text style={styles.emoji}>🤩</Text>
             <Text style={styles.cardText}>Parabéns você economizou</Text>
             <Text style={styles.cardValue}>{`R$${(limiteValor! - totalDespesas).toFixed(0)}`}</Text>
           </>
         )}
-        {scenario === 'gasto' && (
+        {uiScenario === 'gasto' && (
           <>
             <Text style={styles.emoji}>😓</Text>
             <Text style={styles.cardText}>Objetivo não atingido</Text>
             <Text style={styles.cardValue}>{`-R$${(totalDespesas - limiteValor!).toFixed(0)}`}</Text>
           </>
         )}
-        {scenario === 'noInfo' && (
+        {uiScenario === 'noInfo' && (
           <>
             <Text style={styles.emoji}>😴</Text>
             <Text style={styles.cardText}>Progresso não encontrado</Text>
@@ -145,7 +157,7 @@ export default function HomeScreen() {
       </LinearGradient>
 
       {/* Progress bar */}
-      {scenario !== 'noInfo' && (
+      {uiScenario !== 'noInfo' && (
         <View style={{ width: '100%', marginTop: 24 }}>
           <View style={styles.progressHeader}>
             <Text style={{ color: '#000' }}>Progresso</Text>
@@ -158,7 +170,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {scenario === 'noInfo' && (
+      {uiScenario === 'noInfo' && (
         <Pressable style={styles.startButton} onPress={() => navigation.navigate('limites', {})}>
           <Text style={styles.startButtonText}>COMEÇAR</Text>
         </Pressable>

@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { Picker } from '@react-native-picker/picker';
+import React, { useEffect, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   SafeAreaView,
-  View,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  StyleSheet,
-  Pressable,
+  View,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import * as limitesService from '../services/limitesService';
 import { LimiteDTO } from '../resources/limitesResource';
+import * as limitesService from '../services/limitesService';
 
 export default function LimiteScreen() {
   const [valor, setValor] = useState('');
@@ -31,7 +34,7 @@ export default function LimiteScreen() {
 
   async function carregarMesesDisponiveis() {
     try {
-      const lista = await limitesService.listarMesesSelecao(); // ['2025-06', ...]
+      const lista = await limitesService.listarMesesSelecao();
       const listaFormatada = lista.map(monthYearToPick);
       setMeses(listaFormatada);
       if (listaFormatada.length && !mesCadastro) {
@@ -98,7 +101,6 @@ export default function LimiteScreen() {
   }
 
   function monthYearToPick(ym: string) {
-    // '2024-01' -> 'Janeiro/2024'
     const [year, month] = ym.split('-');
     const mesesMap: Record<string, string> = {
       '01': 'Janeiro',
@@ -135,70 +137,76 @@ export default function LimiteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Limite</Text>
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.contentWrapper}>
+          <Text style={styles.title}>Limite</Text>
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Valor</Text>
-        <TextInput
-          style={styles.input}
-          value={valor}
-          onChangeText={setValor}
-          placeholder=""
-          keyboardType="numeric"
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Mês</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker
-            selectedValue={mesCadastro}
-            onValueChange={setMesCadastro}
-            dropdownIconColor="#000"
-          >
-            {meses.map((m) => (
-              <Picker.Item label={m} value={m} key={m} />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      <Pressable style={styles.saveButton} onPress={handleSalvar}>
-        <Text style={styles.saveButtonText}>{editingId ? 'EDITAR' : 'SALVAR'}</Text>
-      </Pressable>
-
-      <Text style={styles.consultaTitle}>Consulta</Text>
-
-      <View style={styles.pickerConsultaWrapper}>
-        <Picker
-          selectedValue={mesConsulta}
-          onValueChange={handleConsulta}
-          dropdownIconColor="#000"
-        >
-          <Picker.Item label="Selecione um mês" value="" />
-          {meses.map((m) => (
-            <Picker.Item label={m} value={m} key={m} />
-          ))}
-        </Picker>
-      </View>
-
-      {(mesConsulta === '' ? limites : limiteConsultado ? [limiteConsultado] : []).map((l) => (
-        <View key={l.id} style={styles.limiteItem}>
-          <Text style={styles.limiteTexto}>{`${monthYearToPick(l.mesReferencia)}   R$${l.valor.toFixed(2)}`}</Text>
-          <View style={styles.limiteBotoes}>
-            <Pressable style={styles.smallButton} onPress={() => handleEditarPress(l)}>
-              <Text style={styles.smallButtonText}>EDITAR</Text>
-            </Pressable>
-            <Pressable style={styles.smallButton} onPress={() => handleExcluirPress(l.id)}>
-              <Text style={styles.smallButtonText}>EXCLUIR</Text>
-            </Pressable>
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Valor</Text>
+            <TextInput
+              style={styles.input}
+              value={valor}
+              onChangeText={setValor}
+              placeholder=""
+              keyboardType="numeric"
+            />
           </View>
-        </View>
-      ))}
 
-      <Text style={styles.resultText}>
-        {mesConsulta && limiteEncontrado === null ? 'Nenhum limite foi encontrado' : ''}
-      </Text>
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Mês</Text>
+            <View style={styles.pickerWrapper}>
+              <Picker
+                selectedValue={mesCadastro}
+                onValueChange={setMesCadastro}
+                dropdownIconColor="#000"
+              >
+                {meses.map((m) => (
+                  <Picker.Item label={m} value={m} key={m} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+
+          <Pressable style={styles.saveButton} onPress={handleSalvar}>
+            <Text style={styles.saveButtonText}>{editingId ? 'EDITAR' : 'SALVAR'}</Text>
+          </Pressable>
+
+          <Text style={styles.consultaTitle}>Consulta</Text>
+
+          <View style={styles.pickerConsultaWrapper}>
+            <Picker
+              selectedValue={mesConsulta}
+              onValueChange={handleConsulta}
+              dropdownIconColor="#000"
+            >
+              <Picker.Item label="Selecione um mês" value="" />
+              {meses.map((m) => (
+                <Picker.Item label={m} value={m} key={m} />
+              ))}
+            </Picker>
+          </View>
+
+          <ScrollView style={styles.listScroll} contentContainerStyle={{paddingBottom:32}}>
+            {(mesConsulta === '' ? limites : limiteConsultado ? [limiteConsultado] : []).map((l) => (
+              <View key={l.id} style={styles.limiteItem}>
+                <Text style={styles.limiteTexto}>{`${monthYearToPick(l.mesReferencia)}   R$${l.valor.toFixed(2)}`}</Text>
+                <View style={styles.limiteBotoes}>
+                  <Pressable style={styles.smallButton} onPress={() => handleEditarPress(l)}>
+                    <Text style={styles.smallButtonText}>EDITAR</Text>
+                  </Pressable>
+                  <Pressable style={styles.smallButton} onPress={() => handleExcluirPress(l.id)}>
+                    <Text style={styles.smallButtonText}>EXCLUIR</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+
+            {mesConsulta && limiteEncontrado === null && (
+              <Text style={styles.resultText}>Nenhum limite foi encontrado</Text>
+            )}
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -207,6 +215,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
+  },
+  contentWrapper: {
+    flex:1,
     paddingHorizontal: 24,
     paddingTop: 48,
   },
@@ -295,6 +306,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  listScroll:{
+    flex:1,
+    marginTop:8,
   },
 });
 

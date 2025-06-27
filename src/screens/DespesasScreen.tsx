@@ -1,17 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Pressable,
-} from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import * as despesasService from '../services/despesasService';
-import { DespesaDTO } from '../resources/despesasResource';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Picker } from '@react-native-picker/picker';
+import React, { useEffect, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { DespesaDTO } from '../resources/despesasResource';
+import * as despesasService from '../services/despesasService';
 
 export default function DespesasScreen() {
   const [descricao, setDescricao] = useState('');
@@ -107,9 +110,7 @@ export default function DespesasScreen() {
     }
     try {
       const lista = await despesasService.listarDespesasPorMesPick(mes);
-      // Se vier mais de uma, pode escolher mostrar todas ou primeira; aqui mostra todas
       if (lista.length > 0) {
-        // opcional: mostrar todas despesas do mês
         setDespesaConsultada(null);
         setDespesas(lista);
       } else {
@@ -144,6 +145,8 @@ export default function DespesasScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.contentWrapper}>
       <Text style={styles.title}>Despesa</Text>
 
       <View style={styles.formGroup}>
@@ -193,34 +196,38 @@ export default function DespesasScreen() {
         </Picker>
       </View>
 
-      {listaParaMostrar.map((d) => (
-        <View key={d.id} style={styles.despesaItem}>
-          <View style={{ flexDirection: 'column', gap: 4 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={styles.despesaNome}>{d.descricao}</Text>
-              <Text style={styles.despesaValor}>{`R$${d.valor.toFixed(2)}`}</Text>
+      <ScrollView style={styles.listScroll} contentContainerStyle={{paddingBottom:32}}>
+        {listaParaMostrar.map((d) => (
+          <View key={d.id} style={styles.despesaItem}>
+            <View style={{ flexDirection: 'column', gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.despesaNome}>{d.descricao}</Text>
+                <Text style={styles.despesaValor}>{`R$${d.valor.toFixed(2)}`}</Text>
+              </View>
+              <Text style={styles.despesaMes}>{monthYearToPick(d.mesReferencia)}</Text>
             </View>
-            <Text style={styles.despesaMes}>{monthYearToPick(d.mesReferencia)}</Text>
+            <View style={styles.despesaBotoes}>
+              <Pressable style={styles.iconButton} onPress={() => {
+                setDescricao(d.descricao);
+                setValor(d.valor.toString());
+                setMesCadastro(monthYearToPick(d.mesReferencia));
+                setEditingId(d.id ?? null);
+              }}>
+                <Ionicons name="pencil" size={18} color="#fff" />
+              </Pressable>
+              <Pressable style={styles.iconButton} onPress={() => excluir(d.id)}>
+                <MaterialIcons name="delete" size={18} color="#fff" />
+              </Pressable>
+            </View>
           </View>
-          <View style={styles.despesaBotoes}>
-            <Pressable style={styles.iconButton} onPress={() => {
-              setDescricao(d.descricao);
-              setValor(d.valor.toString());
-              setMesCadastro(monthYearToPick(d.mesReferencia));
-              setEditingId(d.id ?? null);
-            }}>
-              <Ionicons name="pencil" size={18} color="#fff" />
-            </Pressable>
-            <Pressable style={styles.iconButton} onPress={() => excluir(d.id)}>
-              <MaterialIcons name="delete" size={18} color="#fff" />
-            </Pressable>
-          </View>
-        </View>
-      ))}
+        ))}
 
-      {mesConsulta && listaParaMostrar.length === 0 && (
-        <Text style={styles.resultText}>Nenhuma despesa encontrada</Text>
-      )}
+        {mesConsulta && listaParaMostrar.length === 0 && (
+          <Text style={styles.resultText}>Nenhuma despesa encontrada</Text>
+        )}
+      </ScrollView>
+      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -229,8 +236,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
+  },
+  contentWrapper: {
+    flex:1,
     paddingHorizontal: 24,
     paddingTop: 48,
+  },
+  listScroll:{
+    flex:1,
+    marginTop:8,
   },
   title: {
     fontSize: 28,

@@ -35,7 +35,8 @@ import ProfileScreen from "../screens/ProfileScreen";
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: '#ffffff',
-          tabBarInactiveTintColor: '#ffffff',
+          tabBarInactiveTintColor: '#c9e1c9',
+          tabBarActiveBackgroundColor: '#006400',
           tabBarStyle: {
             backgroundColor: '#008000',
             borderTopWidth: 0,
@@ -55,9 +56,11 @@ import ProfileScreen from "../screens/ProfileScreen";
           component={ProfileScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="person" size={32} color="white">
-
-              </Ionicons>
+              <Ionicons
+                name={focused ? 'person' : 'person-outline'}
+                size={focused ? 36 : 28}
+                color={color}
+              />
             ),
             tabBarLabel: "Perfil",
           }}
@@ -68,10 +71,11 @@ import ProfileScreen from "../screens/ProfileScreen";
           component={HomeScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
-                <MaterialIcons name="monetization-on" size={32} color="white">
-
-              </MaterialIcons>
-              
+              <MaterialIcons
+                name="monetization-on"
+                size={focused ? 36 : 28}
+                color={color}
+              />
             ),
             tabBarLabel: "Início",
           }}
@@ -82,9 +86,11 @@ import ProfileScreen from "../screens/ProfileScreen";
           component={DespesasScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
-                <MaterialCommunityIcons name="file-plus" size={32} color="white">
-
-                </MaterialCommunityIcons>
+              <MaterialCommunityIcons
+                name={focused ? 'file-plus' : 'file-plus-outline'}
+                size={focused ? 36 : 28}
+                color={color}
+              />
             ),
             tabBarLabel: "Despesas",
           }}
@@ -95,9 +101,11 @@ import ProfileScreen from "../screens/ProfileScreen";
           component={LimitesScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
-                <Ionicons name="settings-sharp" size={32} color="white">
-
-                </Ionicons>
+              <Ionicons
+                name={focused ? 'settings-sharp' : 'settings-outline'}
+                size={focused ? 36 : 28}
+                color={color}
+              />
             ),
             tabBarLabel: "Limites",
           }}

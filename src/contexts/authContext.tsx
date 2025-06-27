@@ -1,10 +1,10 @@
-import { createContext, ReactNode, useEffect, useState } from "react";
 import { Buffer } from 'buffer';
+import { createContext, ReactNode, useEffect, useState } from "react";
 
 import { api } from "../utils/api";
 
-import { SignUpDTO } from "../services/auth/authResource";
 import { UserDTO } from "../resources/usuarioResource";
+import { SignUpDTO } from "../services/auth/authResource";
 
 import * as authService from '../services/auth/authService';
 import * as userService from '../services/usuarioService';
@@ -70,6 +70,14 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       await setItem(AUTH_TOKEN_STORAGE, token);
+
+      try {
+        const authenticatedUser = await userService.getAuthenticatedUserService();
+        setUser(authenticatedUser);
+        await setItem(USER_STORAGE, JSON.stringify(authenticatedUser));
+      } catch (err) {
+        console.error('Erro ao buscar usuário autenticado após login', err);
+      }
       return result.data;
     } catch (error) {
       console.error("Erro ao fazer login", error);
