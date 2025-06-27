@@ -1,56 +1,84 @@
-import * as localStorage from '../utils/localStorage';
+import * as despesasResource from '../resources/despesasResource';
+import * as userService from './usuarioService';
 
-const EXPENSES_KEY = 'expenses';
+export async function listarDespesasUsuario() {
+  return await despesasResource.getDespesasUsuario();
+}
 
-export const saveExpense = async (expense) => {
-  // expense: { descricao: string, valor: number, mes: 'YYYY-MM', email: string }
-  const now = new Date();
-  const [ano, mes] = expense.mes.split('-').map(Number);
-  if (ano < now.getFullYear() || (ano === now.getFullYear() && mes < now.getMonth() + 1)) {
-    throw new Error('Não é permitido cadastrar despesa de mês passado.');
-  }
-  const raw = await localStorage.getStorageItem(EXPENSES_KEY);
-  const expenses = raw ? JSON.parse(raw) : [];
-  expenses.push({...expense, id: Date.now()});
-  await localStorage.setStorageItem(EXPENSES_KEY, JSON.stringify(expenses));
-};
+function pickToYearMonth(mesPick: string) {
+  // 'Junho/2025' -> '2025-06'
+  const [mesExtenso, anoStr] = mesPick.split('/');
+  const mesesMap: Record<string, string> = {
+    Janeiro: '01',
+    Fevereiro: '02',
+    Março: '03',
+    Abril: '04',
+    Maio: '05',
+    Junho: '06',
+    Julho: '07',
+    Agosto: '08',
+    Setembro: '09',
+    Outubro: '10',
+    Novembro: '11',
+    Dezembro: '12',
+  };
+  const mesNum = mesesMap[mesExtenso];
+  return `${anoStr}-${mesNum}`;
+}
 
-export const getExpensesByMonth = async (mes, email) => {
-  const raw = await localStorage.getStorageItem(EXPENSES_KEY);
-  const expenses = raw ? JSON.parse(raw) : [];
-  return expenses.filter(e => e.mes === mes && e.email === email);
-};
+export async function cadastrarDespesa(descricao: string, valor: number, mesPick: string) {
+  const mesReferencia = pickToYearMonth(mesPick);
+  const usuario = await userService.getAuthenticatedUserService();
+  if (!usuario?.id) throw new Error('Usuário não identificado');
 
-export const getAllExpenses = async (email) => {
-  const raw = await localStorage.getStorageItem(EXPENSES_KEY);
-  const expenses = raw ? JSON.parse(raw) : [];
-  return expenses.filter(e => e.email === email);
-};
+  const despesa: despesasResource.DespesaDTO = {
+    descricao,
+    valor,
+    mesReferencia,
+    usuario: { id: usuario.id },
+  };
+  return await despesasResource.criarDespesa(despesa);
+}
 
-export const updateExpense = async (id, fields) => {
-  const raw = await localStorage.getStorageItem(EXPENSES_KEY);
-  let expenses = raw ? JSON.parse(raw) : [];
-  const idx = expenses.findIndex(e => e.id === id);
-  if (idx === -1) throw new Error('Despesa não encontrada.');
-  const now = new Date();
-  const [ano, mes] = expenses[idx].mes.split('-').map(Number);
-  if (ano < now.getFullYear() || (ano === now.getFullYear() && mes < now.getMonth() + 1)) {
-    throw new Error('Não é permitido editar despesa de mês passado.');
-  }
-  expenses[idx] = { ...expenses[idx], ...fields };
-  await localStorage.setStorageItem(EXPENSES_KEY, JSON.stringify(expenses));
-};
+export async function atualizarDespesa(id: string, descricao: string, valor: number, mesPick: string) {
+  const mesReferencia = pickToYearMonth(mesPick);
+  const usuario = await userService.getAuthenticatedUserService();
+  if (!usuario?.id) throw new Error('Usuário não identificado');
 
-export const deleteExpense = async (id) => {
-  const raw = await localStorage.getStorageItem(EXPENSES_KEY);
-  let expenses = raw ? JSON.parse(raw) : [];
-  const idx = expenses.findIndex(e => e.id === id);
-  if (idx === -1) throw new Error('Despesa não encontrada.');
-  const now = new Date();
-  const [ano, mes] = expenses[idx].mes.split('-').map(Number);
-  if (ano < now.getFullYear() || (ano === now.getFullYear() && mes < now.getMonth() + 1)) {
-    throw new Error('Não é permitido excluir despesa de mês passado.');
-  }
-  expenses = expenses.filter(e => e.id !== id);
-  await localStorage.setStorageItem(EXPENSES_KEY, JSON.stringify(expenses));
-}; 
+  const despesa: despesasResource.DespesaDTO = {
+    descricao,
+    valor,
+    mesReferencia,
+    usuario: { id: usuario.id },
+  };
+  return await despesasResource.atualizarDespesa(id, despesa);
+}
+
+export async function excluirDespesa(id: string) {
+  await despesasResource.excluirDespesa(id);
+}
+
+export async function listarMesesSelecao() {
+  return await despesasResource.getMesesSelecao();
+}
+
+export async function listarDespesasPorMesPick(mesPick: string) {
+  const [mesExtenso, anoStr] = mesPick.split('/');
+  const mesesMap: Record<string, number> = {
+    Janeiro: 1,
+    Fevereiro: 2,
+    Março: 3,
+    Abril: 4,
+    Maio: 5,
+    Junho: 6,
+    Julho: 7,
+    Agosto: 8,
+    Setembro: 9,
+    Outubro: 10,
+    Novembro: 11,
+    Dezembro: 12,
+  };
+  const mesNum = mesesMap[mesExtenso];
+  const ano = parseInt(anoStr, 10);
+  return await despesasResource.getDespesasPorAnoMes(ano, mesNum);
+}
