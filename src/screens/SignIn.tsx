@@ -18,12 +18,12 @@ import { useAuth } from "../hooks/useAuth";
 
 export function SignIn() {
   const { navigate } = useNavigation<AuthNavigatorRoutesProps>();
-  const { onLogin } = useContext(AuthContext);
+  const { signIn } = useAuth();
   
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({ email: "", password: "" });
+  const [errors, setErrors] = useState({ email: "", senha: "" });
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,7 +31,7 @@ export function SignIn() {
   };
 
   const validateForm = () => {
-    const newErrors = { email: "", password: "" };
+    const newErrors = { email: "", senha: "" };
     let isValid = true;
 
     if (!email.trim()) {
@@ -42,11 +42,11 @@ export function SignIn() {
       isValid = false;
     }
 
-    if (!password.trim()) {
-      newErrors.password = "Senha é obrigatória";
+    if (!senha.trim()) {
+      newErrors.senha = "Senha é obrigatória";
       isValid = false;
-    } else if (password.length < 6) {
-      newErrors.password = "Senha deve ter no mínimo 6 caracteres";
+    } else if (senha.length < 6) {
+      newErrors.senha = "Senha deve ter no mínimo 6 caracteres";
       isValid = false;
     }
 
@@ -61,7 +61,7 @@ export function SignIn() {
 
     setLoading(true);
     try {
-      await onLogin(email.trim(), password);
+      await signIn(email.trim(), senha);
       // A navegação será feita automaticamente pelo contexto de rota principal
     } catch (error: any) {
       Alert.alert("Erro no Login", error.message || "Erro desconhecido ao fazer login");
@@ -111,12 +111,12 @@ export function SignIn() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Senha</Text>
             <TextInput
-              style={[styles.input, errors.password ? styles.inputError : null]}
-              value={password}
+              style={[styles.input, errors.senha ? styles.inputError : null]}
+              value={senha}
               onChangeText={(text) => {
-                setPassword(text);
-                if (errors.password) {
-                  setErrors(prev => ({ ...prev, password: "" }));
+                setSenha(text);
+                if (errors.senha) {
+                  setErrors(prev => ({ ...prev, senha: "" }));
                 }
               }}
               placeholder="Digite sua senha"
@@ -124,7 +124,7 @@ export function SignIn() {
               autoComplete="password"
               editable={!loading}
             />
-            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+            {errors.senha ? <Text style={styles.errorText}>{errors.senha}</Text> : null}
           </View>
 
           <Pressable

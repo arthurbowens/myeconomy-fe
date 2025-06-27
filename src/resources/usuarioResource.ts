@@ -3,6 +3,7 @@ import { setItem } from "../utils/localStorage"
 import { USER_STORAGE } from "../utils/storageConfig"
 
 type UserDTO = {
+  id?: string
   nome: string
   dataNascimento: string
   email: string
@@ -10,9 +11,11 @@ type UserDTO = {
 
 async function getAuthenticatedUser() {
   try {
-    const { data } = await api.get('/me')
+    const { data } = await api.get('/auth/current-user')
 
-    await setItem(USER_STORAGE, JSON.stringify(data.user))
+    if (data) {
+      await setItem(USER_STORAGE, JSON.stringify(data))
+    }
 
     return data
   } catch (error) {

@@ -11,21 +11,14 @@ type SignUpDTO = {
     confirmarSenha: string;
 }
 
-async function signIn(email: string, password: string) {
-    try {
-      const { data } = await api.post('/auth/signin', {
-        email,
-        password
-      })
-  
-      await setItem(AUTH_TOKEN_STORAGE, data.token)
-  
-      return data
-    } catch (error) {
-      throw error
-    }
-  
-  }
+
+
+  async function signIn(email: string, senha: string) {
+    return api.post('/auth/signin', { 
+        email, 
+        senha,
+    });
+};
   
   async function signUp({
     nome,

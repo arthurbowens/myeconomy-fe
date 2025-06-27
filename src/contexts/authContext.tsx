@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useEffect, useState } from "react";
+import { Buffer } from 'buffer';
 
 import { api } from "../utils/api";
 
@@ -8,10 +9,10 @@ import { UserDTO } from "../resources/usuarioResource";
 import * as authService from '../services/auth/authService';
 import * as userService from '../services/usuarioService';
 import { getItem, removeItem, setItem } from "../utils/localStorage";
-import { USER_STORAGE } from "../utils/storageConfig";
+import { AUTH_TOKEN_STORAGE, USER_STORAGE } from "../utils/storageConfig";
 
 export type AuthContextDataProps = {
-  signIn: (email: string, password: string) => Promise<any>
+  signIn: (email: string, senha: string) => Promise<any>
   signUp: (user: SignUpDTO) => Promise<void>
   signOut: () => Promise<void>
   updateUser: (data: UserDTO) => Promise<void>
@@ -46,27 +47,35 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`
   }
 
-  async function signIn(email: string, password: string) {
+  const signIn = async (email: string, senha: string) => {
     try {
-      const data = await authService.signIn(email, password)
-
-      if (data) {
-        updateToken(data.token)
-        setAuthState({
-          authenticated: true,
-          token: data.token
-        })
+      const basicAuth = 'Basic ' + Buffer.from(`${email}:${senha}`).toString('base64');
+  
+      const result = await api.post("/auth/signin", {}, {
+        headers: {
+          'Authorization': basicAuth
+        }
+      });
+  
+      const token = result.data;
+  
+      if (!token) {
+        throw new Error("Token não recebido do servidor");
       }
-
-      if (data) {
-        const user = await userService.getAuthenticatedUserService()
-        setUser(user)
-      }
-      
+  
+      setAuthState({
+        authenticated: true,
+        token: token,
+      });
+  
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      await setItem(AUTH_TOKEN_STORAGE, token);
+      return result.data;
     } catch (error) {
-      throw error
+      console.error("Erro ao fazer login", error);
+      throw error;
     }
-  }
+  };
 
   async function signUp({ nome, dataNascimento, email, senha, confirmarSenha }: SignUpDTO) {
     try {

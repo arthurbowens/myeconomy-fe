@@ -1,9 +1,7 @@
 import * as userResource from '../resources/usuarioResource'
 
 async function getAuthenticatedUserService() {
-  const data = await userResource.getAuthenticatedUser()
-
-  const user: userResource.UserDTO = data.user
+  const user: userResource.UserDTO = await userResource.getAuthenticatedUser()
 
   return user
 }

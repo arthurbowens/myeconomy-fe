@@ -1,9 +1,9 @@
 import * as authResource from './authResource'
 
-async function signIn(email: string, password: string) {
-  const data = await authResource.signIn(email, password)
 
-  return data
+
+async function signIn(email: string, senha: string) {
+  return authResource.signIn(email, senha).then((response) => response.data);
 }
 
 async function signUp({
