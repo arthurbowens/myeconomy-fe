@@ -3,7 +3,7 @@ import { api } from "../utils/api";
 export type LimiteDTO = {
   id?: string;
   valor: number;
-  mesReferencia: string; // formato YYYY-MM
+  mesReferencia: string;
   usuario: {
     id: string;
   };

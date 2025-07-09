@@ -1,7 +1,6 @@
-import React from "react";
-import { SafeAreaView, View, Text, StyleSheet, Pressable } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../hooks/useAuth";
-import { useEffect, useState } from "react";
 import { UserDTO } from "../resources/usuarioResource";
 import * as userService from '../services/usuarioService';
 
@@ -16,7 +15,6 @@ export default function ProfileScreen() {
         const fetchedUser = await userService.getAuthenticatedUserService();
         setUser(fetchedUser);
       } catch (error) {
-        // fallback to context user if fetch fails
         setUser(contextUser);
         console.error('Erro ao buscar usuário autenticado', error);
       }

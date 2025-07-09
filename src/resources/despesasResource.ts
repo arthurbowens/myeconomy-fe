@@ -4,7 +4,7 @@ export type DespesaDTO = {
   id?: string;
   descricao: string;
   valor: number;
-  mesReferencia: string; // formato YYYY-MM
+  mesReferencia: string;
   usuario: {
     id: string;
   };

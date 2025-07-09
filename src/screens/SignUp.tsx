@@ -1,5 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
-import React, { useContext, useState } from "react";
+import React, { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -18,7 +18,6 @@ import { AuthNavigatorRoutesProps } from "../routes/auth.routes";
 
 export function SignUp() {
   const { navigate } = useNavigation<AuthNavigatorRoutesProps>();
-  //const { onRegister } = useContext(AuthContext);
   const { signUp } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -43,7 +42,6 @@ export function SignUp() {
   };
 
   const validateBirthDate = (date: string) => {
-    // Formato esperado: DD/MM/YYYY
     const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
     if (!dateRegex.test(date)) return false;
 
@@ -52,7 +50,7 @@ export function SignUp() {
     const hoje = new Date();
     const idade = hoje.getFullYear() - dataNascimento.getFullYear();
     
-    return idade >= 13 && idade <= 120; // Idade mínima e máxima razoável
+    return idade >= 13 && idade <= 120;
   };
 
   const validateForm = () => {
@@ -65,7 +63,6 @@ export function SignUp() {
     };
     let isValid = true;
 
-    // Validação do nome
     if (!formData.nome.trim()) {
       newErrors.nome = "Nome é obrigatório";
       isValid = false;
@@ -74,7 +71,6 @@ export function SignUp() {
       isValid = false;
     }
 
-    // Validação do email
     if (!formData.email.trim()) {
       newErrors.email = "Email é obrigatório";
       isValid = false;
@@ -83,7 +79,6 @@ export function SignUp() {
       isValid = false;
     }
 
-    // Validação da data de nascimento
     if (!formData.dataNascimento.trim()) {
       newErrors.dataNascimento = "Data de nascimento é obrigatória";
       isValid = false;
@@ -92,7 +87,6 @@ export function SignUp() {
       isValid = false;
     }
 
-    // Validação da senha
     if (!formData.senha.trim()) {
       newErrors.senha = "Senha é obrigatória";
       isValid = false;
@@ -101,7 +95,6 @@ export function SignUp() {
       isValid = false;
     }
 
-    // Validação da confirmação de senha
     if (!formData.confirmarSenha.trim()) {
       newErrors.confirmarSenha = "Confirmação da senha é obrigatória";
       isValid = false;
@@ -115,10 +108,8 @@ export function SignUp() {
   };
 
   const formatBirthDate = (text: string) => {
-    // Remove tudo que não é número
     const numbers = text.replace(/\D/g, "");
     
-    // Aplica máscara DD/MM/YYYY
     if (numbers.length <= 2) {
       return numbers;
     } else if (numbers.length <= 4) {
@@ -135,7 +126,6 @@ export function SignUp() {
     
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    // Limpar erro quando o usuário começar a digitar
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }

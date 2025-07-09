@@ -6,7 +6,6 @@ export async function listarDespesasUsuario() {
 }
 
 function pickToYearMonth(mesPick: string) {
-  // 'Junho/2025' -> '2025-06'
   const [mesExtenso, anoStr] = mesPick.split('/');
   const mesesMap: Record<string, string> = {
     Janeiro: '01',

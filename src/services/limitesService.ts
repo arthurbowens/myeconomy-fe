@@ -7,7 +7,6 @@ export async function listarLimitesUsuario() {
 }
 
 export async function cadastrarLimite(valor: number, mesReferenciaPick: string) {
-  // Converte 'Janeiro/2024' -> '2024-01'
   const [mesExtenso, anoStr] = mesReferenciaPick.split('/');
   const mesesMap: Record<string, string> = {
     Janeiro: '01',
@@ -26,7 +25,6 @@ export async function cadastrarLimite(valor: number, mesReferenciaPick: string) 
   const mesNum = mesesMap[mesExtenso];
   const mesReferencia = `${anoStr}-${mesNum}`;
 
-  // Obter usuário autenticado para pegar id
   const usuario = await userService.getAuthenticatedUserService();
   if (!usuario?.id) {
     throw new Error('Usuário não identificado');

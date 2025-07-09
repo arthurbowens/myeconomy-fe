@@ -1,5 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
-import React, { useContext, useState } from "react";
+import React, { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -12,9 +12,8 @@ import {
     TextInput,
     View
 } from "react-native";
-import { AuthContext } from "../contexts/authContext";
-import { AuthNavigatorRoutesProps } from "../routes/auth.routes";
 import { useAuth } from "../hooks/useAuth";
+import { AuthNavigatorRoutesProps } from "../routes/auth.routes";
 
 export function SignIn() {
   const { navigate } = useNavigation<AuthNavigatorRoutesProps>();
@@ -62,7 +61,6 @@ export function SignIn() {
     setLoading(true);
     try {
       await signIn(email.trim(), senha);
-      // A navegação será feita automaticamente pelo contexto de rota principal
     } catch (error: any) {
       Alert.alert("Erro no Login", error.message || "Erro desconhecido ao fazer login");
     } finally {
