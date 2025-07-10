@@ -3,6 +3,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  FlatList,
+  Modal,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -10,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
-import { ProgressoDTO, Scenario } from '../resources/progressoResource';
+import { ProgressoDTO, ProgressoPorCategoriaDTO, Scenario } from '../resources/progressoResource';
 import { AppNavigatorRoutesProps } from '../routes/app.routes';
 import * as limitesService from '../services/limitesService';
 import * as progressoService from '../services/progressoService';
@@ -26,12 +28,45 @@ export default function HomeScreen() {
   const [totalDespesas, setTotalDespesas] = useState<number>(0);
   const [scenario, setScenario] = useState<Scenario | null>(null);
 
+  const [modalVisible, setModalVisible] = useState(false);
+  const [progressoPorCategoria, setProgressoPorCategoria] = useState<ProgressoPorCategoriaDTO | null>(null);
+
   useEffect(() => {
     async function init() {
       try {
         const listaMeses = await limitesService.listarMesesSelecao();
         const formatada = listaMeses.map(monthYearToPick);
-        setMeses(formatada);
+        
+        const mesesAdicionais = ['Abril/2025', 'Maio/2025'];
+        const listaMesesCompleta = [...formatada, ...mesesAdicionais];
+        
+        const listaMesesOrdenada = listaMesesCompleta.sort((a, b) => {
+          const [mesA, anoA] = a.split('/');
+          const [mesB, anoB] = b.split('/');
+          
+          const mesesMap: Record<string, number> = {
+            Janeiro: 1, Fevereiro: 2, Março: 3, Abril: 4, Maio: 5, Junho: 6,
+            Julho: 7, Agosto: 8, Setembro: 9, Outubro: 10, Novembro: 11, Dezembro: 12
+          };
+          
+          const dataA = parseInt(anoA) * 100 + mesesMap[mesA];
+          const dataB = parseInt(anoB) * 100 + mesesMap[mesB];
+          
+          return dataA - dataB;
+        });
+        
+        setMeses(listaMesesOrdenada);
+        
+        if (!mesSelecionado && listaMesesOrdenada.length > 0) {
+          const agora = new Date();
+          const mesAtual = monthYearToPick(`${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`);
+          
+          if (listaMesesOrdenada.includes(mesAtual)) {
+            setMesSelecionado(mesAtual);
+          } else {
+            setMesSelecionado(listaMesesOrdenada[0]);
+          }
+        }
       } catch (error) {
         console.error('Erro ao carregar meses', error);
       }
@@ -68,6 +103,18 @@ export default function HomeScreen() {
     }
   }
 
+  async function carregarProgressoPorCategoria() {
+    if (!mesSelecionado) return;
+    
+    try {
+      const progresso = await progressoService.obterProgressoPorCategoriaPorMesPick(mesSelecionado);
+      setProgressoPorCategoria(progresso);
+      setModalVisible(true);
+    } catch (error) {
+      console.error('Erro ao carregar progresso por categoria', error);
+    }
+  }
+
   function monthYearToPick(ym: string) {
     const [year, month] = ym.split('-');
     const map: Record<string, string> = {
@@ -89,13 +136,22 @@ export default function HomeScreen() {
 
   const uiScenario = (() => {
     if (!scenario) return 'continue';
+    
+    const isCurrentMonth = (() => {
+      if (!mesSelecionado) return false;
+      const agora = new Date();
+      const mesAtual = monthYearToPick(`${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`);
+      return mesSelecionado === mesAtual;
+    })();
+    
     switch (scenario) {
       case 'ECONOMIZOU':
-        return 'economizou';
+        return isCurrentMonth ? 'continue' : 'economizou';
       case 'NAO_ECONOMIZOU':
         return 'gasto';
-      case 'SEM_INFO':
       case 'SEM_LIMITE':
+        return 'semLimite';
+      case 'SEM_INFO':
       case 'SEM_DESPESA':
         return 'noInfo';
       case 'EM_ANDAMENTO':
@@ -148,6 +204,13 @@ export default function HomeScreen() {
             <Text style={styles.cardValue}>{`-R$${(totalDespesas - limiteValor!).toFixed(0)}`}</Text>
           </>
         )}
+        {uiScenario === 'semLimite' && (
+          <>
+            <Text style={styles.emoji}>📊</Text>
+            <Text style={styles.cardText}>Defina um limite para acompanhar</Text>
+            <Text style={styles.cardValue}>{`R$${totalDespesas.toFixed(0)} gastos`}</Text>
+          </>
+        )}
         {uiScenario === 'noInfo' && (
           <>
             <Text style={styles.emoji}>😴</Text>
@@ -157,16 +220,29 @@ export default function HomeScreen() {
       </LinearGradient>
 
       {/* Progress bar */}
-      {uiScenario !== 'noInfo' && (
+      {uiScenario !== 'noInfo' && mesSelecionado && (
         <View style={{ width: '100%', marginTop: 24 }}>
           <View style={styles.progressHeader}>
             <Text style={{ color: '#000' }}>Progresso</Text>
-            <Text style={{ color: '#000' }}>{`R$${totalDespesas}/${limiteValor}`}</Text>
+            <Text style={{ color: '#000' }}>
+              {uiScenario === 'semLimite' 
+                ? `R$${totalDespesas}` 
+                : `R$${totalDespesas}/${limiteValor}`}
+            </Text>
           </View>
-          <View style={styles.progressBackground}>
-            <View style={[styles.progressFill, { flex: progressRatio }]} />
-            <View style={{ flex: 1 - progressRatio }} />
-          </View>
+          <Pressable onPress={carregarProgressoPorCategoria}>
+            <View style={styles.progressBackground}>
+              <View style={[
+                uiScenario === 'semLimite' ? styles.progressFillNoLimit : styles.progressFill, 
+                { 
+                  flex: uiScenario === 'semLimite' ? (totalDespesas > 0 ? 1 : 0) : progressRatio 
+                }
+              ]} />
+              <View style={{ 
+                flex: uiScenario === 'semLimite' ? (totalDespesas > 0 ? 0 : 1) : (1 - progressRatio) 
+              }} />
+            </View>
+          </Pressable>
         </View>
       )}
 
@@ -175,6 +251,58 @@ export default function HomeScreen() {
           <Text style={styles.startButtonText}>COMEÇAR</Text>
         </Pressable>
       )}
+
+      {/* Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Progresso por categoria</Text>
+              <Pressable onPress={() => setModalVisible(false)}>
+                <Text style={styles.modalCloseButton}>✕</Text>
+              </Pressable>
+            </View>
+
+            {progressoPorCategoria && (
+              <FlatList
+                data={[
+                  {
+                    nomeCategoria: 'Progresso',
+                    totalCategoria: progressoPorCategoria.totalDespesas,
+                    limite: progressoPorCategoria.limite || 0,
+                    isTotal: true
+                  },
+                  ...progressoPorCategoria.categorias.map(cat => ({ ...cat, isTotal: false }))
+                ]}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.categoryItem}>
+                    <Text style={styles.categoryName}>{item.nomeCategoria}</Text>
+                    <Text style={styles.categoryValue}>
+                      R${item.totalCategoria.toFixed(0)}/R${item.limite?.toFixed(0)}
+                    </Text>
+                    <View style={styles.categoryProgressBackground}>
+                      <View style={[
+                        styles.categoryProgressFill,
+                        { 
+                          width: `${Math.min((item.totalCategoria / (item.limite || 1)) * 100, 100)}%`,
+                          backgroundColor: item.totalCategoria > (item.limite || 0) ? '#ff4444' : '#35b559'
+                        }
+                      ]} />
+                    </View>
+                  </View>
+                )}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -251,5 +379,61 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     backgroundColor: '#35b559',
+  },
+  progressFillNoLimit: {
+    backgroundColor: '#ff9800', // Cor diferente para sem limite
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  modalCloseButton: {
+    fontSize: 24,
+    color: '#000',
+  },
+  categoryItem: {
+    marginBottom: 15,
+  },
+  categoryName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 5,
+  },
+  categoryValue: {
+    fontSize: 14,
+    color: '#000',
+    marginBottom: 5,
+  },
+  categoryProgressBackground: {
+    height: 10,
+    backgroundColor: '#ccc',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  categoryProgressFill: {
+    height: '100%',
+    backgroundColor: '#35b559',
+    borderRadius: 5,
   },
 });

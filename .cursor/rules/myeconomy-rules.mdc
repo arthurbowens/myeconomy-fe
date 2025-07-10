@@ -29,6 +29,9 @@ O aplicativo visa permitir que o usuário cadastre suas despesas mensais e acomp
     * Barra de soma das despesas mensais conforme o limite mensal cadastrado (mostrar soma de despesas mesmo sem limite).
     * Filtro por data (mês).
     * Ao finalizar o mês, mostrar se o objetivo foi atingido (gastar menos que o limite), com imagem positiva em caso de sucesso.
+    * Ao clicar na barra, deve ser aberto uma modal contendo a soma das 
+    despesas agrupadas por categoria, sendo que o primeiro item deve ser a soma das despesas x limite do mês 
+    * Caso o usuário tenha cadastrado despesas, mas não cadastrou um limite, deve-se mostrar a barra com a soma de despesas mesmo assim, porém sem limite.
 
 **Requisitos Específicos do Frontend (Baseados em slides fornecidos):**
 

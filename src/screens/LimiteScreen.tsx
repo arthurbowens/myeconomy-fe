@@ -1,6 +1,7 @@
 import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,8 +12,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { LimiteDTO } from '../resources/limitesResource';
 import * as limitesService from '../services/limitesService';
+import { getErrorMessage } from '../utils/errorHandler';
 
 export default function LimiteScreen() {
   const [valor, setValor] = useState('');
@@ -36,9 +39,28 @@ export default function LimiteScreen() {
     try {
       const lista = await limitesService.listarMesesSelecao();
       const listaFormatada = lista.map(monthYearToPick);
-      setMeses(listaFormatada);
-      if (listaFormatada.length && !mesCadastro) {
-        setMesCadastro(listaFormatada[0]);
+      
+      const mesesAdicionais = ['Abril/2025', 'Maio/2025'];
+      const listaMesesCompleta = [...listaFormatada, ...mesesAdicionais];
+      
+      const listaMesesOrdenada = listaMesesCompleta.sort((a, b) => {
+        const [mesA, anoA] = a.split('/');
+        const [mesB, anoB] = b.split('/');
+        
+        const mesesMap: Record<string, number> = {
+          Janeiro: 1, Fevereiro: 2, Março: 3, Abril: 4, Maio: 5, Junho: 6,
+          Julho: 7, Agosto: 8, Setembro: 9, Outubro: 10, Novembro: 11, Dezembro: 12
+        };
+        
+        const dataA = parseInt(anoA) * 100 + mesesMap[mesA];
+        const dataB = parseInt(anoB) * 100 + mesesMap[mesB];
+        
+        return dataA - dataB;
+      });
+      
+      setMeses(listaMesesOrdenada);
+      if (listaMesesOrdenada.length && !mesCadastro) {
+        setMesCadastro(listaMesesOrdenada[0]);
       }
     } catch (error) {
       console.error('Erro ao buscar meses', error);
@@ -46,9 +68,19 @@ export default function LimiteScreen() {
   }
 
   function handleSalvar() {
-    if (!valor) return;
+    if (!valor.trim()) {
+      Alert.alert('Erro', 'Valor é obrigatório');
+      return;
+    }
+    if (!mesCadastro) {
+      Alert.alert('Erro', 'Mês é obrigatório');
+      return;
+    }
     const valorNumber = parseFloat(valor.replace(',', '.'));
-
+    if (isNaN(valorNumber) || valorNumber <= 0) {
+      Alert.alert('Erro', 'Valor deve ser um número maior que zero');
+      return;
+    }
     if (editingId) {
       atualizar();
     } else {
@@ -59,8 +91,10 @@ export default function LimiteScreen() {
       try {
         await limitesService.cadastrarLimite(valorNumber, mesCadastro);
         resetForm();
-      } catch (error) {
+        Toast.show({ type: 'success', text1: 'Limite salvo' });
+      } catch (error: any) {
         console.error('Erro ao salvar limite', error);
+        Alert.alert('Erro', getErrorMessage(error));
       }
     }
 
@@ -68,8 +102,10 @@ export default function LimiteScreen() {
       try {
         await limitesService.atualizarLimite(editingId!, valorNumber, mesCadastro);
         resetForm();
+        Toast.show({ type: 'success', text1: 'Limite atualizado' });
       } catch (error) {
         console.error('Erro ao atualizar limite', error);
+        Alert.alert('Erro', getErrorMessage(error));
       }
     }
   }
@@ -122,7 +158,7 @@ export default function LimiteScreen() {
   const handleEditarPress = (limite: LimiteDTO) => {
     setValor(limite.valor.toString());
     setMesCadastro(monthYearToPick(limite.mesReferencia));
-    setEditingId(limite.id ?? null);
+    setEditingId(limite.id || 'editing');
   };
 
   const handleExcluirPress = async (id?: string) => {
@@ -130,8 +166,10 @@ export default function LimiteScreen() {
     try {
       await limitesService.excluirLimite(id);
       listar();
+      Toast.show({ type: 'success', text1: 'Limite excluído' });
     } catch (error) {
       console.error('Erro ao excluir limite', error);
+      Toast.show({ type: 'error', text1: getErrorMessage(error) });
     }
   };
 
@@ -167,9 +205,20 @@ export default function LimiteScreen() {
             </View>
           </View>
 
-          <Pressable style={styles.saveButton} onPress={handleSalvar}>
-            <Text style={styles.saveButtonText}>{editingId ? 'EDITAR' : 'SALVAR'}</Text>
-          </Pressable>
+          {editingId ? (
+            <View style={styles.buttonRow}>
+              <Pressable style={styles.cancelButton} onPress={resetForm}>
+                <Text style={styles.cancelButtonText}>CANCELAR</Text>
+              </Pressable>
+              <Pressable style={styles.saveButton} onPress={handleSalvar}>
+                <Text style={styles.saveButtonText}>EDITAR</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.saveButtonFull} onPress={handleSalvar}>
+              <Text style={styles.saveButtonText}>SALVAR</Text>
+            </Pressable>
+          )}
 
           <Text style={styles.consultaTitle}>Consulta</Text>
 
@@ -206,6 +255,7 @@ export default function LimiteScreen() {
             )}
           </ScrollView>
         </View>
+        <Toast />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -250,7 +300,20 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
     borderRadius: 6,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 32,
+  },
   saveButton: {
+    backgroundColor: '#35b559',
+    borderRadius: 8,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  saveButtonFull: {
     backgroundColor: '#35b559',
     borderRadius: 8,
     paddingVertical: 16,
@@ -259,6 +322,19 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   saveButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cancelButton: {
+    backgroundColor: '#ff4444',
+    borderRadius: 8,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  cancelButtonText: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',

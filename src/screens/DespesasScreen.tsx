@@ -3,7 +3,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView,
+  Alert, KeyboardAvoidingView,
   Platform,
   Pressable,
   SafeAreaView,
@@ -11,16 +11,22 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from 'react-native';
+import Toast from 'react-native-toast-message';
+import { CategoriaDTO } from '../resources/categoriasResource';
 import { DespesaDTO } from '../resources/despesasResource';
+import * as categoriasService from '../services/categoriasService';
 import * as despesasService from '../services/despesasService';
+import { getErrorMessage } from '../utils/errorHandler';
 
 export default function DespesasScreen() {
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
   const [mesCadastro, setMesCadastro] = useState<string>('');
   const [meses, setMeses] = useState<string[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaDTO[]>([]);
+  const [categoriaId, setCategoriaId] = useState<string>('');
 
   const [despesas, setDespesas] = useState<DespesaDTO[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -31,6 +37,7 @@ export default function DespesasScreen() {
   useEffect(() => {
     async function init() {
       await carregarMeses();
+      await carregarCategorias();
       await listarDespesas();
     }
     init();
@@ -40,8 +47,27 @@ export default function DespesasScreen() {
     try {
       const lista = await despesasService.listarMesesSelecao();
       const formatada = lista.map(monthYearToPick);
-      setMeses(formatada);
-      if (formatada.length && !mesCadastro) setMesCadastro(formatada[0]);
+      
+      const mesesAdicionais = ['Abril/2025', 'Maio/2025'];
+      const listaMesesCompleta = [...formatada, ...mesesAdicionais];
+      
+      const listaMesesOrdenada = listaMesesCompleta.sort((a, b) => {
+        const [mesA, anoA] = a.split('/');
+        const [mesB, anoB] = b.split('/');
+        
+        const mesesMap: Record<string, number> = {
+          Janeiro: 1, Fevereiro: 2, Março: 3, Abril: 4, Maio: 5, Junho: 6,
+          Julho: 7, Agosto: 8, Setembro: 9, Outubro: 10, Novembro: 11, Dezembro: 12
+        };
+        
+        const dataA = parseInt(anoA) * 100 + mesesMap[mesA];
+        const dataB = parseInt(anoB) * 100 + mesesMap[mesB];
+        
+        return dataA - dataB;
+      });
+      
+      setMeses(listaMesesOrdenada);
+      if (listaMesesOrdenada.length && !mesCadastro) setMesCadastro(listaMesesOrdenada[0]);
     } catch (error) {
       console.error('Erro ao buscar meses', error);
     }
@@ -56,31 +82,64 @@ export default function DespesasScreen() {
     }
   }
 
-  function handleSalvar() {
-    if (!descricao.trim() || !valor) return;
-    const valorNumber = parseFloat(valor.replace(',', '.'));
-    if (editingId) {
-      atualizar(editingId, descricao.trim(), valorNumber, mesCadastro);
-    } else {
-      cadastrar(descricao.trim(), valorNumber, mesCadastro);
-    }
-  }
-
-  async function cadastrar(desc: string, val: number, mes: string) {
+  async function carregarCategorias() {
     try {
-      await despesasService.cadastrarDespesa(desc, val, mes);
-      resetForm();
+      const lista = await categoriasService.listarCategoriasService();
+      setCategorias(lista);
+      if (lista.length && !categoriaId) setCategoriaId(lista[0].id);
     } catch (error) {
-      console.error('Erro ao cadastrar despesa', error);
+      console.error('Erro ao buscar categorias', error);
     }
   }
 
-  async function atualizar(id: string, desc: string, val: number, mes: string) {
+  function handleSalvar() {
+    if (!descricao.trim()) {
+      Alert.alert('Erro', 'Descrição é obrigatória');
+      return;
+    }
+    if (!valor.trim()) {
+      Alert.alert('Erro', 'Valor é obrigatório');
+      return;
+    }
+    if (!mesCadastro) {
+      Alert.alert('Erro', 'Mês é obrigatório');
+      return;
+    }
+    if (!categoriaId) {
+      Alert.alert('Erro', 'Categoria é obrigatória');
+      return;
+    }
+    const valorNumber = parseFloat(valor.replace(',', '.'));
+    if (isNaN(valorNumber) || valorNumber <= 0) {
+      Alert.alert('Erro', 'Valor deve ser um número maior que zero');
+      return;
+    }
+    if (editingId) {
+      atualizar(editingId, descricao.trim(), valorNumber, mesCadastro, categoriaId);
+    } else {
+      cadastrar(descricao.trim(), valorNumber, mesCadastro, categoriaId);
+    }
+  }
+
+  async function cadastrar(desc: string, val: number, mes: string, catId: string) {
     try {
-      await despesasService.atualizarDespesa(id, desc, val, mes);
+      await despesasService.cadastrarDespesa(desc, val, mes, catId);
       resetForm();
+      Toast.show({ type: 'success', text1: 'Despesa salva com sucesso' });
+    } catch (error: any) {
+      console.error('Erro ao cadastrar despesa', error);
+      Alert.alert('Erro', getErrorMessage(error));
+    }
+  }
+
+  async function atualizar(id: string, desc: string, val: number, mes: string, catId: string) {
+    try {
+      await despesasService.atualizarDespesa(id, desc, val, mes, catId);
+      resetForm();
+      Toast.show({ type: 'success', text1: 'Despesa atualizada' });
     } catch (error) {
       console.error('Erro ao atualizar despesa', error);
+      Alert.alert('Erro', getErrorMessage(error));
     }
   }
 
@@ -89,8 +148,10 @@ export default function DespesasScreen() {
     try {
       await despesasService.excluirDespesa(id);
       listarDespesas();
+      Toast.show({ type: 'success', text1: 'Despesa excluída' });
     } catch (error) {
       console.error('Erro ao excluir despesa', error);
+      Toast.show({ type: 'error', text1: getErrorMessage(error) });
     }
   }
 
@@ -118,6 +179,7 @@ export default function DespesasScreen() {
       }
     } catch (error) {
       console.error('Erro ao consultar despesas por mês', error);
+      Toast.show({ type: 'error', text1: getErrorMessage(error) });
       setDespesas([]);
     }
   }
@@ -143,6 +205,22 @@ export default function DespesasScreen() {
 
   const listaParaMostrar = despesas;
 
+  const formatValue = (text: string) => {
+    const numbers = text.replace(/[^\d,.]/g, "");
+    
+    const parts = numbers.split(/[,.]/);
+    if (parts.length > 2) {
+      return parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    return numbers;
+  };
+
+  const handleValueChange = (text: string) => {
+    const formatted = formatValue(text);
+    setValor(formatted);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -164,7 +242,7 @@ export default function DespesasScreen() {
         <TextInput
           style={styles.input}
           value={valor}
-          onChangeText={setValor}
+          onChangeText={handleValueChange}
           placeholder="0.00"
           keyboardType="numeric"
         />
@@ -181,9 +259,31 @@ export default function DespesasScreen() {
         </View>
       </View>
 
-      <Pressable style={styles.saveButton} onPress={handleSalvar}>
-        <Text style={styles.saveButtonText}>{editingId ? 'EDITAR' : 'SALVAR'}</Text>
-      </Pressable>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Categoria</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker selectedValue={categoriaId} onValueChange={setCategoriaId} dropdownIconColor="#000">
+            {categorias.map((c) => (
+              <Picker.Item label={c.nome} value={c.id} key={c.id} />
+            ))}
+          </Picker>
+        </View>
+      </View>
+
+                {editingId ? (
+            <View style={styles.buttonRow}>
+              <Pressable style={styles.cancelButton} onPress={resetForm}>
+                <Text style={styles.cancelButtonText}>CANCELAR</Text>
+              </Pressable>
+              <Pressable style={styles.saveButton} onPress={handleSalvar}>
+                <Text style={styles.saveButtonText}>EDITAR</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.saveButtonFull} onPress={handleSalvar}>
+              <Text style={styles.saveButtonText}>SALVAR</Text>
+            </Pressable>
+          )}
 
       <Text style={styles.consultaTitle}>Histórico</Text>
 
@@ -211,6 +311,7 @@ export default function DespesasScreen() {
                 setDescricao(d.descricao);
                 setValor(d.valor.toString());
                 setMesCadastro(monthYearToPick(d.mesReferencia));
+                setCategoriaId(d.categoria?.id ?? '');
                 setEditingId(d.id ?? null);
               }}>
                 <Ionicons name="pencil" size={18} color="#fff" />
@@ -228,6 +329,7 @@ export default function DespesasScreen() {
       </ScrollView>
       </View>
       </KeyboardAvoidingView>
+      <Toast />
     </SafeAreaView>
   );
 }
@@ -247,14 +349,14 @@ const styles = StyleSheet.create({
     marginTop:8,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
     color: '#000000',
   },
   formGroup: {
-    marginBottom: 24,
+    marginBottom: 12,
   },
   label: {
     fontSize: 18,
@@ -275,24 +377,50 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
     borderRadius: 6,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
   saveButton: {
     backgroundColor: '#35b559',
     borderRadius: 8,
-    paddingVertical: 16,
+    paddingVertical: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 32,
+    flex: 1,
+  },
+  saveButtonFull: {
+    backgroundColor: '#35b559',
+    borderRadius: 8,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   saveButtonText: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',
   },
+  cancelButton: {
+    backgroundColor: '#ff4444',
+    borderRadius: 8,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  cancelButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
   consultaTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   pickerConsultaWrapper: {
     borderWidth: 1,

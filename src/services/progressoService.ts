@@ -23,4 +23,10 @@ function pickToYearMonth(mesPick: string) {
 export async function obterProgressoPorMesPick(mesPick: string) {
   const anoMes = pickToYearMonth(mesPick);
   return await progressoResource.getProgresso(anoMes);
+}
+
+export async function obterProgressoPorCategoriaPorMesPick(mesPick: string) {
+  const anoMes = pickToYearMonth(mesPick);
+  const [ano, mes] = anoMes.split('-');
+  return await progressoResource.getProgressoPorCategoria(parseInt(ano), parseInt(mes));
 } 

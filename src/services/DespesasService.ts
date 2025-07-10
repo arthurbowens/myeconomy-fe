@@ -25,7 +25,7 @@ function pickToYearMonth(mesPick: string) {
   return `${anoStr}-${mesNum}`;
 }
 
-export async function cadastrarDespesa(descricao: string, valor: number, mesPick: string) {
+export async function cadastrarDespesa(descricao: string, valor: number, mesPick: string, categoriaId: string) {
   const mesReferencia = pickToYearMonth(mesPick);
   const usuario = await userService.getAuthenticatedUserService();
   if (!usuario?.id) throw new Error('Usuário não identificado');
@@ -35,11 +35,12 @@ export async function cadastrarDespesa(descricao: string, valor: number, mesPick
     valor,
     mesReferencia,
     usuario: { id: usuario.id },
+    categoria: { id: categoriaId },
   };
   return await despesasResource.criarDespesa(despesa);
 }
 
-export async function atualizarDespesa(id: string, descricao: string, valor: number, mesPick: string) {
+export async function atualizarDespesa(id: string, descricao: string, valor: number, mesPick: string, categoriaId: string) {
   const mesReferencia = pickToYearMonth(mesPick);
   const usuario = await userService.getAuthenticatedUserService();
   if (!usuario?.id) throw new Error('Usuário não identificado');
@@ -49,6 +50,7 @@ export async function atualizarDespesa(id: string, descricao: string, valor: num
     valor,
     mesReferencia,
     usuario: { id: usuario.id },
+    categoria: { id: categoriaId },
   };
   return await despesasResource.atualizarDespesa(id, despesa);
 }
