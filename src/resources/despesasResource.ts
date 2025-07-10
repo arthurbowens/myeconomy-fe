@@ -8,6 +8,9 @@ export type DespesaDTO = {
   usuario: {
     id: string;
   };
+  categoria?: {
+    id: string;
+  };
 };
 
 export async function getDespesasUsuario() {
