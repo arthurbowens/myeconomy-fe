@@ -1,27 +1,17 @@
 import {
-    BottomTabNavigationProp,
-    createBottomTabNavigator,
-  } from "@react-navigation/bottom-tabs";
-  import { Platform } from "react-native";
+  BottomTabNavigationProp,
+  createBottomTabNavigator,
+} from "@react-navigation/bottom-tabs";
+import { Platform } from "react-native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
-import FontAwesomeIcons from "@expo/vector-icons/FontAwesome6";
-import HomeScreen from "../screens/HomeScreen";
-import ProfileScreen from "../screens/ProfileScreen";
-import LimitesScreen from "../screens/LimiteScreen";
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import DespesasScreen from "../screens/DespesasScreen";
-
-  const MyTabs = createBottomTabNavigator({
-      screens: {
-          Home: HomeScreen,
-          Perfil: ProfileScreen,
-          Limites: LimitesScreen,
-          Despesas: DespesasScreen,
-      },
-      id: undefined
-  });
+import HomeScreen from "../screens/HomeScreen";
+import LimitesScreen from "../screens/LimiteScreen";
+import ProfileScreen from "../screens/ProfileScreen";
   
- 
   type AppRoutes = {
     home: undefined;
     perfil: undefined;
@@ -40,12 +30,13 @@ import DespesasScreen from "../screens/DespesasScreen";
   export function AppRoutes() {
   
     return (
-      <Navigator
+      <Navigator id={undefined}
         initialRouteName="home"
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: '#ffffff',
-          tabBarInactiveTintColor: '#ffffff',
+          tabBarInactiveTintColor: '#c9e1c9',
+          tabBarActiveBackgroundColor: '#006400',
           tabBarStyle: {
             backgroundColor: '#008000',
             borderTopWidth: 0,
@@ -65,9 +56,11 @@ import DespesasScreen from "../screens/DespesasScreen";
           component={ProfileScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="checkmark-circle" size={32} color="red">
-
-              </Ionicons>
+              <Ionicons
+                name={focused ? 'person' : 'person-outline'}
+                size={focused ? 36 : 28}
+                color={color}
+              />
             ),
             tabBarLabel: "Perfil",
           }}
@@ -78,10 +71,11 @@ import DespesasScreen from "../screens/DespesasScreen";
           component={HomeScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
-                <Ionicons name="checkmark-circle" size={32} color="red">
-
-              </Ionicons>
-              
+              <MaterialIcons
+                name="monetization-on"
+                size={focused ? 36 : 28}
+                color={color}
+              />
             ),
             tabBarLabel: "Início",
           }}
@@ -92,9 +86,11 @@ import DespesasScreen from "../screens/DespesasScreen";
           component={DespesasScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
-                <Ionicons name="checkmark-circle" size={32} color="red">
-
-                </Ionicons>
+              <MaterialCommunityIcons
+                name={focused ? 'file-plus' : 'file-plus-outline'}
+                size={focused ? 36 : 28}
+                color={color}
+              />
             ),
             tabBarLabel: "Despesas",
           }}
@@ -105,9 +101,11 @@ import DespesasScreen from "../screens/DespesasScreen";
           component={LimitesScreen}
           options={{
             tabBarIcon: ({ color, focused }) => (
-                <Ionicons name="checkmark-circle" size={32} color="red">
-
-                </Ionicons>
+              <Ionicons
+                name={focused ? 'settings-sharp' : 'settings-outline'}
+                size={focused ? 36 : 28}
+                color={color}
+              />
             ),
             tabBarLabel: "Limites",
           }}

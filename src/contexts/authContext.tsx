@@ -1,109 +1,184 @@
-import React, {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import * as localStorage from "../utils/localStorage";
+import { Buffer } from 'buffer';
+import { createContext, ReactNode, useEffect, useState } from "react";
 
-interface AuthContextProps {
-  onRegister: (
-    name: string,
-    email: string,
-    password: string,
-    confirmPassword: string
-  ) => Promise<void>;
-  onLogin: (email: string, password: string) => Promise<any>;
-  onLogout: () => Promise<void>;
-  authState: AuthenticateProps;
-  user: UserProps | null;
+import { api } from "../utils/api";
+
+import { UserDTO } from "../resources/usuarioResource";
+import { SignUpDTO } from "../services/auth/authResource";
+
+import * as authService from '../services/auth/authService';
+import * as userService from '../services/usuarioService';
+import { getItem, removeItem, setItem } from "../utils/localStorage";
+import { AUTH_TOKEN_STORAGE, USER_STORAGE } from "../utils/storageConfig";
+
+export type AuthContextDataProps = {
+  signIn: (email: string, senha: string) => Promise<any>
+  signUp: (user: SignUpDTO) => Promise<void>
+  signOut: () => Promise<void>
+  updateUser: (data: UserDTO) => Promise<void>
+  user: UserDTO
+  isLoading: boolean
+  authState?: {
+    token: string | null
+    authenticated: boolean | null
+  }
 }
 
-interface AuthenticateProps {
-  authenticated: boolean;
+interface AuthenticatedProps {
+  token: string | null
+  authenticated: boolean | null
 }
 
-interface UserProps {
-  nome: string;
-  email: string;
-  senha: string;
+export type AuthContextProviderProps = {
+  children: ReactNode
 }
 
-//Tipando por causa do typescript
-type AuthProviderProps = {
-  children: ReactNode;
-};
+export const AuthContext = createContext<AuthContextDataProps>({} as AuthContextDataProps);
 
-const USERS_KEY = "users";
-const SESSION_KEY = "session";
+export function AuthContextProvider({ children }: AuthContextProviderProps) {
+  const [user, setUser] = useState<UserDTO>({} as UserDTO)
+  const [isLoading, setIsLoading] = useState(false)
+  const [authState, setAuthState] = useState<AuthenticatedProps>({
+    token: null,
+    authenticated: null
+  })
 
-export const AuthContext = createContext<AuthContextProps>({} as AuthContextProps);
+  async function updateToken(token: string) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  }
 
-export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [authState, setAuthState] = useState<AuthenticateProps>({ authenticated: false });
-  const [user, setUser] = useState<UserProps | null>(null);
+  const signIn = async (email: string, senha: string) => {
+    try {
+      const basicAuth = 'Basic ' + Buffer.from(`${email}:${senha}`).toString('base64');
+  
+      const result = await api.post("/auth/signin", {}, {
+        headers: {
+          'Authorization': basicAuth
+        }
+      });
+  
+      const token = result.data;
+  
+      if (!token) {
+        throw new Error("Token não recebido do servidor");
+      }
+  
+      setAuthState({
+        authenticated: true,
+        token: token,
+      });
+  
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      await setItem(AUTH_TOKEN_STORAGE, token);
+
+      try {
+        const authenticatedUser = await userService.getAuthenticatedUserService();
+        setUser(authenticatedUser);
+        await setItem(USER_STORAGE, JSON.stringify(authenticatedUser));
+      } catch (err) {
+        console.error('Erro ao buscar usuário autenticado após login', err);
+      }
+      return result.data;
+    } catch (error) {
+      console.error("Erro ao fazer login", error);
+      throw error;
+    }
+  };
+
+  async function signUp({ nome, dataNascimento, email, senha, confirmarSenha }: SignUpDTO) {
+    try {
+      await authService.signUp({ nome, dataNascimento, email,senha, confirmarSenha })
+    } catch (error) {
+      throw error
+    }
+  }
+
+  async function signOut() {
+    try {
+      setIsLoading(true)
+
+      await authService.signOut()
+
+      setUser({} as UserDTO)
+      await removeItem(USER_STORAGE)
+
+      setAuthState({
+        token: null,
+        authenticated: null
+      })
+    } catch (error) {
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function updateUser(data: UserDTO) {
+    try {
+      await userService.updateUserService(data)
+
+      setUser(data)
+      await setItem(USER_STORAGE, JSON.stringify(data))
+
+    } catch (error) {
+      throw error
+    }
+  }
+
+  async function loadUserData() {
+    try {
+      setIsLoading(true)
+
+      const storedUser = await getItem(USER_STORAGE)
+
+      const user: UserDTO = storedUser ? JSON.parse(storedUser) : {}
+
+      if (user) {
+        setUser(user)
+      }
+    } catch (error) {
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function loadToken() {
+    try {
+      setIsLoading(true)
+
+      const token = await authService.getAuthToken()
+
+      if (token) {
+        await updateToken(token)
+        setAuthState({
+          token,
+          authenticated: true
+        })
+      }
+    } catch (error) {
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const loadSession = async () => {
-      const session = await localStorage.getStorageItem(SESSION_KEY);
-      if (session) {
-        const sessionObj = JSON.parse(session);
-        setAuthState({ authenticated: true });
-        setUser(sessionObj);
-      }
-    };
-    loadSession();
-  }, []);
+    loadToken()
+    loadUserData()
+  }, [])
 
-  const register = async (
-    name: string,
-    email: string,
-    password: string,
-    confirmPassword: string
-  ) => {
-    if (!name || !email || !password || !confirmPassword) {
-      throw new Error("Preencha todos os campos obrigatórios.");
-    }
-    if (password !== confirmPassword) {
-      throw new Error("As senhas não coincidem.");
-    }
-    const usersRaw = await localStorage.getStorageItem(USERS_KEY);
-    const users: UserProps[] = usersRaw ? JSON.parse(usersRaw) : [];
-    if (users.find((u) => u.email === email)) {
-      throw new Error("Já existe um usuário com este email.");
-    }
-    const newUser: UserProps = { nome: name, email, senha: password };
-    users.push(newUser);
-    await localStorage.setStorageItem(USERS_KEY, JSON.stringify(users));
-  };
-
-  const login = async (email: string, password: string) => {
-    const usersRaw = await localStorage.getStorageItem(USERS_KEY);
-    const users: UserProps[] = usersRaw ? JSON.parse(usersRaw) : [];
-    const found = users.find((u) => u.email === email && u.senha === password);
-    if (!found) {
-      throw new Error("Email ou senha inválidos.");
-    }
-    await localStorage.setStorageItem(SESSION_KEY, JSON.stringify(found));
-    setAuthState({ authenticated: true });
-    setUser(found);
-    return found;
-  };
-
-  const logout = async () => {
-    await localStorage.removeStorageItem(SESSION_KEY);
-    setAuthState({ authenticated: false });
-    setUser(null);
-  };
-
-  const value = {
-    onRegister: register,
-    onLogin: login,
-    onLogout: logout,
-    authState,
-    user,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
+  return (
+    <AuthContext.Provider value={{
+      signIn,
+      signUp,
+      signOut,
+      updateUser,
+      user,
+      isLoading,
+      authState
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}

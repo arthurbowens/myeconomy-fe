@@ -2,24 +2,24 @@ import {
     createNativeStackNavigator,
     NativeStackNavigationProp,
   } from "@react-navigation/native-stack";
-import Login from "../screens/login/Login";
-import Cadastro from "../screens/login/Cadastro";
+  import { SignIn } from "../screens/SignIn";
+  import { SignUp } from '../screens/SignUp';
 
-  type AuthRoutes = {
-    login: undefined;
-    cadastro: undefined;
-  };
-  
-  export type AuthNavigatorRoutesProps = NativeStackNavigationProp<AuthRoutes>;
-  
-  const { Navigator, Screen } = createNativeStackNavigator<AuthRoutes>();
-  
-  export function AuthRoutes() {
-    return (
-      <Navigator screenOptions={{ headerShown: false }}>
-        <Screen name="login" component={Login} />
-  
-        <Screen name="cadastro" component={Cadastro} />
-      </Navigator>
-    );
-  }
+type AuthRoutes = {
+  signIn: undefined;
+  signUp: undefined;
+};
+
+export type AuthNavigatorRoutesProps = NativeStackNavigationProp<AuthRoutes>;
+
+const { Navigator, Screen } = createNativeStackNavigator<AuthRoutes>();
+
+export function AuthRoutes() {
+  return (
+    <Navigator id={undefined} screenOptions={{ headerShown: false }}>
+      <Screen name="signIn" component={SignIn} />
+
+      <Screen name="signUp" component={SignUp} />
+    </Navigator>
+  );
+}

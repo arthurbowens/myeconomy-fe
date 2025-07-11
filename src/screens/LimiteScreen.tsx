@@ -1,338 +1,391 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { saveLimit, getLimitByMonth, updateLimit, deleteLimit } from '../services/LimiteService';
-import { useAuth } from '../hooks/useAuth';
-import { FontAwesome, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import Toast from 'react-native-toast-message';
+import { LimiteDTO } from '../resources/limitesResource';
+import * as limitesService from '../services/limitesService';
+import { getErrorMessage } from '../utils/errorHandler';
 
-export default function Limite({ navigation }) {
-  const { user } = useAuth();
+export default function LimiteScreen() {
   const [valor, setValor] = useState('');
-  const [mesCadastro, setMesCadastro] = useState(() => { // Picker para cadastro de limite
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-  const [mesConsulta, setMesConsulta] = useState(() => { // Picker para consulta de limite
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-  const [error, setError] = useState('');
-  const [consultedLimit, setConsultedLimit] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [editValor, setEditValor] = useState('');
+  const [meses, setMeses] = useState<string[]>([]);
+  const [mesCadastro, setMesCadastro] = useState<string>('');
+  const [mesConsulta, setMesConsulta] = useState<string>('');
+  const [limiteEncontrado, setLimiteEncontrado] = useState<number | null>(null);
+  const [limites, setLimites] = useState<LimiteDTO[]>([]);
+  const [limiteConsultado, setLimiteConsultado] = useState<LimiteDTO | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const getMonthName = (mes: string) => {
-    const [year, month] = mes.split('-');
-    const date = new Date(Number(year), Number(month) - 1, 1);
-    return date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-  };
-
-  const mesesOptions = () => {
-    const now = new Date();
-    const meses = [];
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      meses.push(m);
+  useEffect(() => {
+    async function carregarInicial() {
+      await listar();
+      await carregarMesesDisponiveis();
     }
-    return meses;
-  };
+    carregarInicial();
+  }, []);
 
-  const carregarLimiteConsultado = async (mes) => {
-    if (!user) return;
+  async function carregarMesesDisponiveis() {
     try {
-      const limit = await getLimitByMonth(mes, user.email);
-      setConsultedLimit(limit);
-      if (limit) setEditValor(String(limit.valor));
-      else setEditValor('');
-      setEditMode(false);
-    } catch (e) {
-      setError(e.message);
-      setConsultedLimit(null);
-      setEditValor('');
-      setEditMode(false);
-    }
-  };
-
-  useEffect(() => { carregarLimiteConsultado(mesConsulta); }, [mesConsulta, user]);
-
-  const handleSave = async () => {
-    setError('');
-    if (!valor || !mesCadastro) { setError('Preencha todos os campos.'); return; }
-    try {
-      await saveLimit({ valor: Number(valor), mes: mesCadastro, email: user.email });
-      setValor('');
-      // Se o mês salvo for o mesmo do mês de consulta, atualiza a consulta
-      if (mesCadastro === mesConsulta) {
-        await carregarLimiteConsultado(mesConsulta);
+      const lista = await limitesService.listarMesesSelecao();
+      const listaFormatada = lista.map(monthYearToPick);
+      
+      const mesesAdicionais = ['Abril/2025', 'Maio/2025'];
+      const listaMesesCompleta = [...listaFormatada, ...mesesAdicionais];
+      
+      const listaMesesOrdenada = listaMesesCompleta.sort((a, b) => {
+        const [mesA, anoA] = a.split('/');
+        const [mesB, anoB] = b.split('/');
+        
+        const mesesMap: Record<string, number> = {
+          Janeiro: 1, Fevereiro: 2, Março: 3, Abril: 4, Maio: 5, Junho: 6,
+          Julho: 7, Agosto: 8, Setembro: 9, Outubro: 10, Novembro: 11, Dezembro: 12
+        };
+        
+        const dataA = parseInt(anoA) * 100 + mesesMap[mesA];
+        const dataB = parseInt(anoB) * 100 + mesesMap[mesB];
+        
+        return dataA - dataB;
+      });
+      
+      setMeses(listaMesesOrdenada);
+      if (listaMesesOrdenada.length && !mesCadastro) {
+        setMesCadastro(listaMesesOrdenada[0]);
       }
-    } catch (e) { setError(e.message); }
-  };
+    } catch (error) {
+      console.error('Erro ao buscar meses', error);
+    }
+  }
 
-  const handleUpdate = async () => {
-    setError('');
-    if (!editValor) { setError('Preencha o valor para atualizar.'); return; }
-    if (!consultedLimit) { setError('Nenhum limite selecionado para atualizar.'); return; }
+  function handleSalvar() {
+    if (!valor.trim()) {
+      Alert.alert('Erro', 'Valor é obrigatório');
+      return;
+    }
+    if (!mesCadastro) {
+      Alert.alert('Erro', 'Mês é obrigatório');
+      return;
+    }
+    const valorNumber = parseFloat(valor.replace(',', '.'));
+    if (isNaN(valorNumber) || valorNumber <= 0) {
+      Alert.alert('Erro', 'Valor deve ser um número maior que zero');
+      return;
+    }
+    if (editingId) {
+      atualizar();
+    } else {
+      cadastrar();
+    }
+
+    async function cadastrar() {
+      try {
+        await limitesService.cadastrarLimite(valorNumber, mesCadastro);
+        resetForm();
+        Toast.show({ type: 'success', text1: 'Limite salvo' });
+      } catch (error: any) {
+        console.error('Erro ao salvar limite', error);
+        Alert.alert('Erro', getErrorMessage(error));
+      }
+    }
+
+    async function atualizar() {
+      try {
+        await limitesService.atualizarLimite(editingId!, valorNumber, mesCadastro);
+        resetForm();
+        Toast.show({ type: 'success', text1: 'Limite atualizado' });
+      } catch (error) {
+        console.error('Erro ao atualizar limite', error);
+        Alert.alert('Erro', getErrorMessage(error));
+      }
+    }
+  }
+
+  function resetForm() {
+    setValor('');
+    setEditingId(null);
+    listar();
+  }
+
+  async function listar() {
     try {
-      await updateLimit(consultedLimit.id, Number(editValor));
-      setEditMode(false);
-      await carregarLimiteConsultado(mesConsulta); // Recarrega o limite após atualizar
-    } catch (e) { setError(e.message); }
+      const data = await limitesService.listarLimitesUsuario();
+      setLimites(data);
+    } catch (error) {
+      console.error('Erro ao carregar limites', error);
+    }
+  }
+
+  function handleConsulta(consultaMes: string) {
+    setMesConsulta(consultaMes);
+    if (!consultaMes) {
+      setLimiteEncontrado(null);
+      return;
+    }
+    const found = limites.find((l) => monthYearToPick(l.mesReferencia) === consultaMes);
+    setLimiteEncontrado(found ? found.valor : null);
+    setLimiteConsultado(found ?? null);
+  }
+
+  function monthYearToPick(ym: string) {
+    const [year, month] = ym.split('-');
+    const mesesMap: Record<string, string> = {
+      '01': 'Janeiro',
+      '02': 'Fevereiro',
+      '03': 'Março',
+      '04': 'Abril',
+      '05': 'Maio',
+      '06': 'Junho',
+      '07': 'Julho',
+      '08': 'Agosto',
+      '09': 'Setembro',
+      '10': 'Outubro',
+      '11': 'Novembro',
+      '12': 'Dezembro',
+    };
+    return `${mesesMap[month]}/${year}`;
+  }
+
+  const handleEditarPress = (limite: LimiteDTO) => {
+    setValor(limite.valor.toString());
+    setMesCadastro(monthYearToPick(limite.mesReferencia));
+    setEditingId(limite.id || 'editing');
   };
 
-  const handleDelete = () => {
-    setError('');
-    if (!consultedLimit) { setError('Nenhum limite selecionado para excluir.'); return; }
-    Alert.alert('Excluir limite', 'Tem certeza que deseja excluir o limite deste mês?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => {
-        try {
-          await deleteLimit(consultedLimit.id);
-          setConsultedLimit(null);
-          setEditValor('');
-          setEditMode(false);
-        } catch (e) { setError(e.message); }
-      }}
-    ]);
+  const handleExcluirPress = async (id?: string) => {
+    if (!id) return;
+    try {
+      await limitesService.excluirLimite(id);
+      listar();
+      Toast.show({ type: 'success', text1: 'Limite excluído' });
+    } catch (error) {
+      console.error('Erro ao excluir limite', error);
+      Toast.show({ type: 'error', text1: getErrorMessage(error) });
+    }
   };
 
   return (
-    <View style={styles.root}>
-      <Text style={styles.title}>Limite</Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.contentWrapper}>
+          <Text style={styles.title}>Limite</Text>
 
-      {/* Formulário de Cadastro */}
-      <View style={styles.formContainer}>
-        <TextInput style={styles.input} placeholder="Valor" value={valor} onChangeText={setValor} keyboardType="numeric" />
-        <View style={styles.pickerContainer}>
-          <Picker selectedValue={mesCadastro} onValueChange={setMesCadastro} style={styles.picker}>
-            {mesesOptions().map(m => <Picker.Item key={m} label={getMonthName(m)} value={m} />)}
-          </Picker>
-        </View>
-        <TouchableOpacity style={styles.button} onPress={handleSave}><Text style={styles.buttonText}>SALVAR</Text></TouchableOpacity>
-      </View>
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Valor</Text>
+            <TextInput
+              style={styles.input}
+              value={valor}
+              onChangeText={setValor}
+              placeholder=""
+              keyboardType="numeric"
+            />
+          </View>
 
-      {!!error && <Text style={styles.error}>{error}</Text>}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Mês</Text>
+            <View style={styles.pickerWrapper}>
+              <Picker
+                selectedValue={mesCadastro}
+                onValueChange={setMesCadastro}
+                dropdownIconColor="#000"
+              >
+                {meses.map((m) => (
+                  <Picker.Item label={m} value={m} key={m} />
+                ))}
+              </Picker>
+            </View>
+          </View>
 
-      {/* Consulta */}
-      <View style={styles.consultaContainer}>
-        <Text style={styles.consultaTitle}>Consulta</Text>
-        <View style={styles.pickerContainer}>
-          <Picker selectedValue={mesConsulta} onValueChange={setMesConsulta} style={styles.picker}>
-            {mesesOptions().map(m => <Picker.Item key={m} label={getMonthName(m)} value={m} />)}
-          </Picker>
-        </View>
-
-        {consultedLimit ? (
-          editMode ? (
-            <View style={styles.editConsultedContainer}>
-              <TextInput style={styles.input} value={editValor} onChangeText={setEditValor} keyboardType="numeric" placeholder="Novo Valor" />
-              <View style={styles.editButtonsContainer}>
-                <TouchableOpacity style={[styles.button, styles.updateButton]} onPress={handleUpdate}><Text style={styles.buttonText}>ATUALIZAR</Text></TouchableOpacity>
-                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setEditMode(false)}><Text style={styles.buttonText}>CANCELAR</Text></TouchableOpacity>
-              </View>
+          {editingId ? (
+            <View style={styles.buttonRow}>
+              <Pressable style={styles.cancelButton} onPress={resetForm}>
+                <Text style={styles.cancelButtonText}>CANCELAR</Text>
+              </Pressable>
+              <Pressable style={styles.saveButton} onPress={handleSalvar}>
+                <Text style={styles.saveButtonText}>EDITAR</Text>
+              </Pressable>
             </View>
           ) : (
-            <View style={styles.consultedLimitContainer}>
-              <Text style={styles.consultedLimitText}>{getMonthName(consultedLimit.mes)} R$ {Number(consultedLimit.valor).toFixed(2)}</Text>
-              <View style={styles.consultedButtonsContainer}>
-                 <TouchableOpacity style={[styles.actionButton]} onPress={() => setEditMode(true)}><FontAwesome name="pencil" size={20} color="green" /></TouchableOpacity>
-                 <TouchableOpacity style={[styles.actionButton]} onPress={handleDelete}><FontAwesome name="trash" size={20} color="red" /></TouchableOpacity>
-              </View>
-            </View>
-          )
-        ) : (
-          <Text style={styles.noDataText}>Nenhum limite foi encontrado</Text>
-        )}
-      </View>
+            <Pressable style={styles.saveButtonFull} onPress={handleSalvar}>
+              <Text style={styles.saveButtonText}>SALVAR</Text>
+            </Pressable>
+          )}
 
-      {/* Menu Inferior */}
-      <View style={styles.menuContainer}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('MeusDados')}>
-           <FontAwesome name="user" size={24} color="black" />
-          <Text style={styles.menuButtonText}>Perfil</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Home')}>
-           <Ionicons name="home" size={24} color="black" />
-          <Text style={styles.menuButtonText}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Despesas')}>
-           <MaterialCommunityIcons name="currency-usd" size={24} color="black" />
-          <Text style={styles.menuButtonText}>Despesas</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Limite')}>
-           <Ionicons name="settings" size={24} color="black" />
-          <Text style={styles.menuButtonText}>Config</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          <Text style={styles.consultaTitle}>Consulta</Text>
+
+          <View style={styles.pickerConsultaWrapper}>
+            <Picker
+              selectedValue={mesConsulta}
+              onValueChange={handleConsulta}
+              dropdownIconColor="#000"
+            >
+              <Picker.Item label="Selecione um mês" value="" />
+              {meses.map((m) => (
+                <Picker.Item label={m} value={m} key={m} />
+              ))}
+            </Picker>
+          </View>
+
+          <ScrollView style={styles.listScroll} contentContainerStyle={{paddingBottom:32}}>
+            {(mesConsulta === '' ? limites : limiteConsultado ? [limiteConsultado] : []).map((l) => (
+              <View key={l.id} style={styles.limiteItem}>
+                <Text style={styles.limiteTexto}>{`${monthYearToPick(l.mesReferencia)}   R$${l.valor.toFixed(2)}`}</Text>
+                <View style={styles.limiteBotoes}>
+                  <Pressable style={styles.smallButton} onPress={() => handleEditarPress(l)}>
+                    <Text style={styles.smallButtonText}>EDITAR</Text>
+                  </Pressable>
+                  <Pressable style={styles.smallButton} onPress={() => handleExcluirPress(l.id)}>
+                    <Text style={styles.smallButtonText}>EXCLUIR</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+
+            {mesConsulta && limiteEncontrado === null && (
+              <Text style={styles.resultText}>Nenhum limite foi encontrado</Text>
+            )}
+          </ScrollView>
+        </View>
+        <Toast />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingTop: 40,
-    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  contentWrapper: {
+    flex:1,
+    paddingHorizontal: 24,
+    paddingTop: 48,
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 28,
+    fontWeight: '700',
     textAlign: 'center',
-    color: '#222',
+    marginBottom: 32,
+    color: '#000000',
   },
-  formContainer: {
-    width: '90%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+  formGroup: {
+    marginBottom: 24,
   },
-  pickerContainer: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    overflow: 'hidden',
+  label: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000000',
     marginBottom: 8,
-  },
-  picker: {
-    height: 50,
-    width: '100%',
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    fontSize: 16,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#000000',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    height: 48,
+    width: '100%',
   },
-  button: {
-    backgroundColor: '#4CAF50', // Verde
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 6,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 32,
+  },
+  saveButton: {
+    backgroundColor: '#35b559',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 16,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    flex: 1,
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  saveButtonFull: {
+    backgroundColor: '#35b559',
+    borderRadius: 8,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  error: {
-    color: 'red',
-    marginBottom: 8,
-    textAlign: 'center',
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  consultaContainer: {
-    width: '90%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    flex: 1, // Para ocupar o espaço restante
+  cancelButton: {
+    backgroundColor: '#ff4444',
+    borderRadius: 8,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  cancelButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
   },
   consultaTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: '700',
     textAlign: 'center',
-    color: '#222',
+    marginBottom: 16,
   },
-  consultedLimitContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#e0e0e0', // Cinza claro
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  consultedLimitText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#222',
-  },
-  consultedButtonsContainer: {
-    flexDirection: 'row',
-  },
-  editButton: {
-    backgroundColor: '#ffc107', // Amarelo
+  pickerConsultaWrapper: {
+    borderWidth: 1,
+    borderColor: '#000000',
     borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 8,
   },
-  deleteButton: {
-    backgroundColor: '#dc3545', // Vermelho
+  resultText: {
+    textAlign: 'center',
+    marginTop: 16,
+    color: '#000000',
+  },
+  limiteItem: {
+    backgroundColor: '#35b55933',
     borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-   editConsultedContainer: {
-    // Estilos para o modo de edição do limite consultado
-   },
-   editButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    padding: 8,
     marginTop: 8,
-   },
-   updateButton: {
-    backgroundColor: '#ffc107', // Amarelo
-    flex: 1,
-    marginRight: 4,
-   },
-   cancelButton: {
-    backgroundColor: '#dc3545', // Vermelho
-    flex: 1,
-    marginLeft: 4,
-   },
-  noDataText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#666',
-    marginTop: 20,
   },
-  menuContainer: {
+  limiteTexto: {
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 4,
+  },
+  limiteBotoes: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#4CAF50', // Fundo verde para o menu
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  menuButton: {
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  menuButtonText: {
-    color: '#fff',
-    fontWeight: 'normal',
-    fontSize: 12,
-    textAlign: 'center',
+    gap: 8,
     marginTop: 4,
   },
-  actionButton: {
-    marginLeft: 10,
+  smallButton: {
+    flex: 1,
+    backgroundColor: '#35b559',
+    borderRadius: 4,
+    paddingVertical: 10,
+    alignItems: 'center',
   },
-}); 
+  smallButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  listScroll:{
+    flex:1,
+    marginTop:8,
+  },
+});
+

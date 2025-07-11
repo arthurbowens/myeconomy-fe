@@ -1,333 +1,474 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Picker } from '@react-native-picker/picker';
-import { saveExpense, getExpensesByMonth, updateExpense, deleteExpense } from '../services/DespesasService';
-import { useAuth } from '../hooks/useAuth';
-import { FontAwesome, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert, KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from 'react-native';
+import Toast from 'react-native-toast-message';
+import { CategoriaDTO } from '../resources/categoriasResource';
+import { DespesaDTO } from '../resources/despesasResource';
+import * as categoriasService from '../services/categoriasService';
+import * as despesasService from '../services/despesasService';
+import { getErrorMessage } from '../utils/errorHandler';
 
-export default function Despesas({ navigation }) {
-  const { user } = useAuth();
+export default function DespesasScreen() {
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
-  const [mesCadastro, setMesCadastro] = useState(() => { // Picker para cadastro de despesa
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-  const [mesHistorico, setMesHistorico] = useState(() => { // Picker para histórico de despesa
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-  const [error, setError] = useState('');
-  const [expenses, setExpenses] = useState([]);
-  const [filteredExpenses, setFilteredExpenses] = useState([]);
-  const [editId, setEditId] = useState(null);
-  const [editDescricao, setEditDescricao] = useState('');
-  const [editValor, setEditValor] = useState('');
+  const [mesCadastro, setMesCadastro] = useState<string>('');
+  const [meses, setMeses] = useState<string[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaDTO[]>([]);
+  const [categoriaId, setCategoriaId] = useState<string>('');
 
-  const getMonthName = (mes: string) => {
-    const [year, month] = mes.split('-');
-    const date = new Date(Number(year), Number(month) - 1, 1);
-    return date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-  };
+  const [despesas, setDespesas] = useState<DespesaDTO[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const mesesOptions = () => {
-    const now = new Date();
-    const meses = [];
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      meses.push(m);
+  const [mesConsulta, setMesConsulta] = useState('');
+  const [despesaConsultada, setDespesaConsultada] = useState<DespesaDTO | null>(null);
+
+  useEffect(() => {
+    async function init() {
+      await carregarMeses();
+      await carregarCategorias();
+      await listarDespesas();
     }
-    return meses;
-  };
+    init();
+  }, []);
 
-  const carregarExpenses = async (mes) => {
-    if (!user) return;
+  async function carregarMeses() {
     try {
-      const data = await getExpensesByMonth(mes, user.email);
-      setFilteredExpenses(data);
-    } catch (e) {
-      setError(e.message);
-      setFilteredExpenses([]);
+      const lista = await despesasService.listarMesesSelecao();
+      const formatada = lista.map(monthYearToPick);
+      
+      const mesesAdicionais = ['Abril/2025', 'Maio/2025'];
+      const listaMesesCompleta = [...formatada, ...mesesAdicionais];
+      
+      const listaMesesOrdenada = listaMesesCompleta.sort((a, b) => {
+        const [mesA, anoA] = a.split('/');
+        const [mesB, anoB] = b.split('/');
+        
+        const mesesMap: Record<string, number> = {
+          Janeiro: 1, Fevereiro: 2, Março: 3, Abril: 4, Maio: 5, Junho: 6,
+          Julho: 7, Agosto: 8, Setembro: 9, Outubro: 10, Novembro: 11, Dezembro: 12
+        };
+        
+        const dataA = parseInt(anoA) * 100 + mesesMap[mesA];
+        const dataB = parseInt(anoB) * 100 + mesesMap[mesB];
+        
+        return dataA - dataB;
+      });
+      
+      setMeses(listaMesesOrdenada);
+      if (listaMesesOrdenada.length && !mesCadastro) setMesCadastro(listaMesesOrdenada[0]);
+    } catch (error) {
+      console.error('Erro ao buscar meses', error);
     }
-  };
+  }
 
-  useEffect(() => { carregarExpenses(mesHistorico); }, [mesHistorico, user]);
-
-  const handleSave = async () => {
-    setError('');
-    if (!descricao || !valor || !mesCadastro) { setError('Preencha todos os campos.'); return; }
+  async function listarDespesas() {
     try {
-      await saveExpense({ descricao, valor: Number(valor), mes: mesCadastro, email: user.email });
-      setDescricao(''); setValor('');
-      await carregarExpenses(mesHistorico); // Recarregar histórico após salvar
-    } catch (e) { setError(e.message); }
-  };
+      const lista = await despesasService.listarDespesasUsuario();
+      setDespesas(lista);
+    } catch (error) {
+      console.error('Erro ao listar despesas', error);
+    }
+  }
 
-  const handleEdit = (item) => {
-    setEditId(item.id);
-    setEditDescricao(item.descricao);
-    setEditValor(String(item.valor));
-  };
+  async function refreshDespesas() {
+    if (mesConsulta) {
+      await handleConsulta(mesConsulta);
+    } else {
+      await listarDespesas();
+    }
+  }
 
-  const handleUpdate = async () => {
-    setError('');
+  async function carregarCategorias() {
     try {
-      await updateExpense(editId, { descricao: editDescricao, valor: Number(editValor) });
-      setEditId(null); setEditDescricao(''); setEditValor('');
-      await carregarExpenses(mesHistorico); // Recarregar histórico após atualizar
-    } catch (e) { setError(e.message); }
+      const lista = await categoriasService.listarCategoriasService();
+      setCategorias(lista);
+      if (lista.length && !categoriaId) setCategoriaId(lista[0].id);
+    } catch (error) {
+      console.error('Erro ao buscar categorias', error);
+    }
+  }
+
+  function handleSalvar() {
+    if (!descricao.trim()) {
+      Alert.alert('Erro', 'Descrição é obrigatória');
+      return;
+    }
+    if (!valor.trim()) {
+      Alert.alert('Erro', 'Valor é obrigatório');
+      return;
+    }
+    if (!mesCadastro) {
+      Alert.alert('Erro', 'Mês é obrigatório');
+      return;
+    }
+    if (!categoriaId) {
+      Alert.alert('Erro', 'Categoria é obrigatória');
+      return;
+    }
+    const valorNumber = parseFloat(valor.replace(',', '.'));
+    if (isNaN(valorNumber) || valorNumber <= 0) {
+      Alert.alert('Erro', 'Valor deve ser um número maior que zero');
+      return;
+    }
+    if (editingId) {
+      atualizar(editingId, descricao.trim(), valorNumber, mesCadastro, categoriaId);
+    } else {
+      cadastrar(descricao.trim(), valorNumber, mesCadastro, categoriaId);
+    }
+  }
+
+  async function cadastrar(desc: string, val: number, mes: string, catId: string) {
+    try {
+      await despesasService.cadastrarDespesa(desc, val, mes, catId);
+      resetForm();
+      Toast.show({ type: 'success', text1: 'Despesa salva com sucesso' });
+    } catch (error: any) {
+      console.error('Erro ao cadastrar despesa', error);
+      Alert.alert('Erro', getErrorMessage(error));
+    }
+  }
+
+  async function atualizar(id: string, desc: string, val: number, mes: string, catId: string) {
+    try {
+      await despesasService.atualizarDespesa(id, desc, val, mes, catId);
+      resetForm();
+      Toast.show({ type: 'success', text1: 'Despesa atualizada' });
+    } catch (error) {
+      console.error('Erro ao atualizar despesa', error);
+      Alert.alert('Erro', getErrorMessage(error));
+    }
+  }
+
+  async function excluir(id?: string) {
+    if (!id) return;
+    try {
+      await despesasService.excluirDespesa(id);
+      refreshDespesas();
+      Toast.show({ type: 'success', text1: 'Despesa excluída' });
+    } catch (error) {
+      console.error('Erro ao excluir despesa', error);
+      Toast.show({ type: 'error', text1: getErrorMessage(error) });
+    }
+  }
+
+  function resetForm() {
+    setDescricao('');
+    setValor('');
+    setEditingId(null);
+    refreshDespesas();
+  }
+
+  async function handleConsulta(mes: string) {
+    setMesConsulta(mes);
+    if (mes === '') {
+      setDespesaConsultada(null);
+      await listarDespesas();
+      return;
+    }
+    try {
+      const lista = await despesasService.listarDespesasPorMesPick(mes);
+      if (lista.length > 0) {
+        setDespesaConsultada(null);
+        setDespesas(lista);
+      } else {
+        setDespesas([]);
+      }
+    } catch (error) {
+      console.error('Erro ao consultar despesas por mês', error);
+      Toast.show({ type: 'error', text1: getErrorMessage(error) });
+      setDespesas([]);
+    }
+  }
+
+  function monthYearToPick(ym: string) {
+    const [year, month] = ym.split('-');
+    const map: Record<string, string> = {
+      '01': 'Janeiro',
+      '02': 'Fevereiro',
+      '03': 'Março',
+      '04': 'Abril',
+      '05': 'Maio',
+      '06': 'Junho',
+      '07': 'Julho',
+      '08': 'Agosto',
+      '09': 'Setembro',
+      '10': 'Outubro',
+      '11': 'Novembro',
+      '12': 'Dezembro',
+    };
+    return `${map[month]}/${year}`;
+  }
+
+  const listaParaMostrar = despesas;
+
+  const formatValue = (text: string) => {
+    const numbers = text.replace(/[^\d,.]/g, "");
+    
+    const parts = numbers.split(/[,.]/);
+    if (parts.length > 2) {
+      return parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    return numbers;
   };
 
-  const handleDelete = (id) => {
-    Alert.alert('Excluir despesa', 'Tem certeza que deseja excluir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: async () => {
-        try { await deleteExpense(id); await carregarExpenses(mesHistorico); } catch (e) { setError(e.message); }
-      }}
-    ]);
+  const handleValueChange = (text: string) => {
+    const formatted = formatValue(text);
+    setValor(formatted);
   };
-
-  const renderItem = ({ item }) => (
-    <View style={styles.expenseItem}>
-      {editId === item.id ? (
-        <View>
-          <TextInput style={styles.input} value={editDescricao} onChangeText={setEditDescricao} placeholder="Descrição" />
-          <TextInput style={styles.input} value={editValor} onChangeText={setEditValor} keyboardType="numeric" placeholder="Valor" />
-          <View style={styles.editButtonsContainer}>
-             <TouchableOpacity style={[styles.button, styles.updateButton]} onPress={handleUpdate}><Text style={styles.buttonText}>Atualizar</Text></TouchableOpacity>
-             <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setEditId(null)}><Text style={styles.buttonText}>Cancelar</Text></TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.itemDetails}>
-          <Text style={styles.itemText}>{item.descricao}</Text>
-          <Text style={styles.itemText}>R$ {Number(item.valor).toFixed(2)}</Text>
-           <View style={styles.itemActions}>
-             <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}><FontAwesome name="pencil" size={20} color="green" /></TouchableOpacity>
-             <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.actionButton}><FontAwesome name="trash" size={20} color="red" /></TouchableOpacity>
-           </View>
-        </View>
-      )}
-    </View>
-  );
 
   return (
-    <View style={styles.root}>
-      <Text style={styles.title}>Despesas</Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.contentWrapper}>
+      <Text style={styles.title}>Despesa</Text>
 
-      {/* Formulário de Cadastro */}
-      <View style={styles.formContainer}>
-        <TextInput style={styles.input} placeholder="Descrição" value={descricao} onChangeText={setDescricao} />
-        <TextInput style={styles.input} placeholder="Valor" value={valor} onChangeText={setValor} keyboardType="numeric" />
-        <View style={styles.pickerContainer}>
-          <Picker selectedValue={mesCadastro} onValueChange={setMesCadastro} style={styles.picker}>
-            {mesesOptions().map(m => <Picker.Item key={m} label={getMonthName(m)} value={m} />)}
-          </Picker>
-        </View>
-        <TouchableOpacity style={styles.button} onPress={handleSave}><Text style={styles.buttonText}>SALVAR</Text></TouchableOpacity>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Descrição</Text>
+        <TextInput
+          style={styles.input}
+          value={descricao}
+          onChangeText={setDescricao}
+          placeholder="Digite a descrição"
+        />
       </View>
 
-      {!!error && <Text style={styles.error}>{error}</Text>}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Valor</Text>
+        <TextInput
+          style={styles.input}
+          value={valor}
+          onChangeText={handleValueChange}
+          placeholder="0.00"
+          keyboardType="numeric"
+        />
+      </View>
 
-      {/* Histórico */}
-      <View style={styles.historyContainer}>
-        <Text style={styles.historyTitle}>Histórico</Text>
-        <View style={styles.pickerContainer}>
-          <Picker selectedValue={mesHistorico} onValueChange={setMesHistorico} style={styles.picker}>
-            {mesesOptions().map(m => <Picker.Item key={m} label={getMonthName(m)} value={m} />)}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Mês</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker selectedValue={mesCadastro} onValueChange={setMesCadastro} dropdownIconColor="#000">
+            {meses.map((m) => (
+              <Picker.Item label={m} value={m} key={m} />
+            ))}
           </Picker>
         </View>
-        {filteredExpenses.length > 0 ? (
-           <FlatList
-            data={filteredExpenses}
-            keyExtractor={item => item.id.toString()}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-           />
-        ) : (
-          <Text style={styles.noDataText}>Nenhuma despesa encontrada</Text>
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Categoria</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker selectedValue={categoriaId} onValueChange={setCategoriaId} dropdownIconColor="#000">
+            {categorias.map((c) => (
+              <Picker.Item label={c.nome} value={c.id} key={c.id} />
+            ))}
+          </Picker>
+        </View>
+      </View>
+
+                {editingId ? (
+            <View style={styles.buttonRow}>
+              <Pressable style={styles.cancelButton} onPress={resetForm}>
+                <Text style={styles.cancelButtonText}>CANCELAR</Text>
+              </Pressable>
+              <Pressable style={styles.saveButton} onPress={handleSalvar}>
+                <Text style={styles.saveButtonText}>EDITAR</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.saveButtonFull} onPress={handleSalvar}>
+              <Text style={styles.saveButtonText}>SALVAR</Text>
+            </Pressable>
+          )}
+
+      <Text style={styles.consultaTitle}>Histórico</Text>
+
+      <View style={styles.pickerConsultaWrapper}>
+        <Picker selectedValue={mesConsulta} onValueChange={handleConsulta} dropdownIconColor="#000">
+          <Picker.Item label="Selecione um mês" value="" />
+          {meses.map((m) => (
+            <Picker.Item label={m} value={m} key={m} />
+          ))}
+        </Picker>
+      </View>
+
+      <ScrollView style={styles.listScroll} contentContainerStyle={{paddingBottom:32}}>
+        {listaParaMostrar.map((d) => (
+          <View key={d.id} style={styles.despesaItem}>
+            <View style={{ flexDirection: 'column', gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.despesaNome}>{d.descricao}</Text>
+                <Text style={styles.despesaValor}>{`R$${d.valor.toFixed(2)}`}</Text>
+              </View>
+              <Text style={styles.despesaMes}>{monthYearToPick(d.mesReferencia)}</Text>
+            </View>
+            <View style={styles.despesaBotoes}>
+              <Pressable style={styles.iconButton} onPress={() => {
+                setDescricao(d.descricao);
+                setValor(d.valor.toString());
+                setMesCadastro(monthYearToPick(d.mesReferencia));
+                setCategoriaId(d.categoria?.id ?? '');
+                setEditingId(d.id ?? null);
+              }}>
+                <Ionicons name="pencil" size={18} color="#fff" />
+              </Pressable>
+              <Pressable style={styles.iconButton} onPress={() => excluir(d.id)}>
+                <MaterialIcons name="delete" size={18} color="#fff" />
+              </Pressable>
+            </View>
+          </View>
+        ))}
+
+        {mesConsulta && listaParaMostrar.length === 0 && (
+          <Text style={styles.resultText}>Nenhuma despesa encontrada</Text>
         )}
-
+      </ScrollView>
       </View>
-
-      {/* Menu Inferior */}
-      <View style={styles.menuContainer}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('MeusDados')}>
-           <FontAwesome name="user" size={24} color="black" />
-          <Text style={styles.menuButtonText}>Perfil</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Home')}>
-           <Ionicons name="home" size={24} color="black" />
-          <Text style={styles.menuButtonText}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Despesas')}>
-           <MaterialCommunityIcons name="currency-usd" size={24} color="black" />
-          <Text style={styles.menuButtonText}>Despesas</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Limite')}>
-           <Ionicons name="settings" size={24} color="black" />
-          <Text style={styles.menuButtonText}>Config</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      </KeyboardAvoidingView>
+      <Toast />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingTop: 40,
-    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  contentWrapper: {
+    flex:1,
+    paddingHorizontal: 24,
+    paddingTop: 48,
+  },
+  listScroll:{
+    flex:1,
+    marginTop:8,
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 24,
+    fontWeight: '700',
     textAlign: 'center',
-    color: '#222',
-  },
-  formContainer: {
-    width: '90%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    color: '#000000',
   },
-  pickerContainer: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    overflow: 'hidden',
+  formGroup: {
+    marginBottom: 12,
+  },
+  label: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000000',
     marginBottom: 8,
-  },
-  picker: {
-    height: 50,
-    width: '100%',
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    fontSize: 16,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#000000',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    height: 48,
+    width: '100%',
   },
-  button: {
-    backgroundColor: '#4CAF50', // Verde
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 6,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  saveButton: {
+    backgroundColor: '#35b559',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    flex: 1,
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  error: {
-    color: 'red',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  historyContainer: {
-    width: '90%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    flex: 1, // Para ocupar o espaço restante
-  },
-  historyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-    color: '#222',
-  },
-  listContent: {
-    paddingBottom: 16, // Espaço no final da lista antes do menu
-  },
-  expenseItem: {
-    backgroundColor: '#e0e0e0', // Cinza claro
+  saveButtonFull: {
+    backgroundColor: '#35b559',
     borderRadius: 8,
-    padding: 12,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cancelButton: {
+    backgroundColor: '#ff4444',
+    borderRadius: 8,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  cancelButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  consultaTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
     marginBottom: 8,
   },
-   itemDetails: {
+  pickerConsultaWrapper: {
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  despesaItem: {
+    backgroundColor: '#35b55933',
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-   },
-   itemText: {
-    fontSize: 16,
-    color: '#222',
-   },
-   itemActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-   },
-   actionButton: {
-    marginLeft: 10,
-   },
-   editButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
-   },
-   updateButton: {
-    backgroundColor: '#ffc107', // Amarelo
-    flex: 1,
-    marginRight: 4,
-   },
-   cancelButton: {
-    backgroundColor: '#dc3545', // Vermelho
-    flex: 1,
-    marginLeft: 4,
-   },
-  noDataText: {
-    textAlign: 'center',
-    fontSize: 16,
+  },
+  despesaNome: {
+    color: '#000',
+    fontWeight: '700',
+  },
+  despesaValor: {
+    color: '#000',
+    fontWeight: '700',
+  },
+  despesaMes: {
     color: '#666',
-    marginTop: 20,
-  },
-  menuContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#4CAF50', // Fundo verde para o menu
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  menuButton: {
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  menuButtonText: {
-    color: '#fff',
-    fontWeight: 'normal',
     fontSize: 12,
-    textAlign: 'center',
-    marginTop: 4,
   },
-}); 
+  despesaBotoes: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  iconButton: {
+    backgroundColor: '#35b559',
+    borderRadius: 4,
+    padding: 6,
+  },
+  resultText: {
+    textAlign: 'center',
+    marginTop: 16,
+    color: '#000000',
+  },
+});
