@@ -82,6 +82,14 @@ export default function DespesasScreen() {
     }
   }
 
+  async function refreshDespesas() {
+    if (mesConsulta) {
+      await handleConsulta(mesConsulta);
+    } else {
+      await listarDespesas();
+    }
+  }
+
   async function carregarCategorias() {
     try {
       const lista = await categoriasService.listarCategoriasService();
@@ -147,7 +155,7 @@ export default function DespesasScreen() {
     if (!id) return;
     try {
       await despesasService.excluirDespesa(id);
-      listarDespesas();
+      refreshDespesas();
       Toast.show({ type: 'success', text1: 'Despesa excluída' });
     } catch (error) {
       console.error('Erro ao excluir despesa', error);
@@ -159,7 +167,7 @@ export default function DespesasScreen() {
     setDescricao('');
     setValor('');
     setEditingId(null);
-    listarDespesas();
+    refreshDespesas();
   }
 
   async function handleConsulta(mes: string) {
